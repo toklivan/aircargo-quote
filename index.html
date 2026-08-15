@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<!-- lang="fr" : indique la langue de la page (utile pour les lecteurs d'écran et le SEO) -->
+<html lang="fr">
+<head>
+  <!-- charset="UTF-8" : permet d'afficher correctement les accents (é, è, ç...) -->
+  <meta charset="UTF-8">
+  <!-- viewport : indispensable pour que la page s'affiche correctement sur mobile -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AirCargo Quote — Cotation de fret aérien</title>
+  <!--
+    On charge le CSS dans le <head> (contrairement au JS qu'on met en bas).
+    Pourquoi l'inverse : on veut que le style soit connu AVANT que la page
+    s'affiche, sinon l'utilisateur verrait brièvement la page toute nue.
+  -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header>
+    <h1>AirCargo Quote</h1>
+    <p>Outil de cotation de fret aérien</p>
+  </header>
+
+  <main>
+
+    <!-- ===== SECTION 1 : LE FORMULAIRE ===== -->
+    <section class="carte">
+      <h2>Nouvelle cotation</h2>
+
+      <!--
+        <form> : regroupe les champs de saisie.
+        L'attribut id nous permettra de le retrouver depuis le JavaScript.
+        On utilise un vrai <form> (et pas juste des <input> en vrac) pour deux raisons :
+        - la validation automatique du navigateur (attribut "required")
+        - la touche Entrée qui valide le formulaire, gratuitement
+      -->
+      <form id="formulaire-cotation">
+
+        <!--
+          <label for="..."> associé à un <input id="..."> :
+          cliquer sur le texte du label place le curseur dans le champ.
+          C'est une règle d'accessibilité de base, et c'est gratuit.
+        -->
+        <div class="champ">
+          <label for="depart">Aéroport de départ</label>
+          <select id="depart" name="depart" required>
+            <option value="CDG">CDG — Paris Charles de Gaulle</option>
+            <option value="MRS">MRS — Marseille Provence</option>
+            <option value="LGG">LGG — Liège</option>
+            <option value="JFK">JFK — New York</option>
+            <option value="DXB">DXB — Dubaï</option>
+            <option value="HKG">HKG — Hong Kong</option>
+            <option value="SIN">SIN — Singapour</option>
+          </select>
+        </div>
+
+        <div class="champ">
+          <label for="arrivee">Aéroport d'arrivée</label>
+          <!-- selected : présélectionne cette option à l'ouverture de la page -->
+          <select id="arrivee" name="arrivee" required>
+            <option value="CDG">CDG — Paris Charles de Gaulle</option>
+            <option value="MRS">MRS — Marseille Provence</option>
+            <option value="LGG">LGG — Liège</option>
+            <option value="JFK">JFK — New York</option>
+            <option value="DXB">DXB — Dubaï</option>
+            <option value="HKG" selected>HKG — Hong Kong</option>
+            <option value="SIN">SIN — Singapour</option>
+          </select>
+        </div>
+
+        <div class="champ">
+          <label for="poids">Poids brut (kg)</label>
+          <!--
+            type="number" : le navigateur n'accepte que des chiffres.
+            min / step : bornes de saisie vérifiées par le navigateur.
+            required : le formulaire ne peut pas être envoyé si le champ est vide.
+          -->
+          <input type="number" id="poids" name="poids" min="1" step="1" value="250" required>
+        </div>
+
+        <div class="champ">
+          <label for="volume">Volume (m³)</label>
+          <input type="number" id="volume" name="volume" min="0.1" step="0.1" value="2" required>
+        </div>
+
+        <div class="champ">
+          <label for="type">Type de marchandise</label>
+          <select id="type" name="type" required>
+            <option value="standard">Standard</option>
+            <option value="fragile">Fragile</option>
+            <option value="perissable">Périssable (chaîne du froid)</option>
+            <option value="dangereuse">Dangereuse (DGR)</option>
+          </select>
+        </div>
+
+        <div class="champ">
+          <label for="date">Date d'expédition souhaitée</label>
+          <input type="date" id="date" name="date" required>
+        </div>
+
+        <!--
+          type="submit" : ce bouton déclenche l'envoi du formulaire.
+          C'est cet évènement "submit" que le JavaScript va intercepter.
+          Le libellé dit ce qui va se passer, pas "Envoyer".
+        -->
+        <button type="submit">Calculer la cotation</button>
+      </form>
+    </section>
+
+    <!-- ===== SECTION 2 : LE RÉSULTAT ===== -->
+
+    <!--
+      role="alert" : indique aux lecteurs d'écran que ce message doit être
+      annoncé dès qu'il apparaît. L'attribut "hidden" masque l'élément
+      tant que le JavaScript ne l'a pas retiré.
+    -->
+    <p id="message-erreur" role="alert" hidden></p>
+
+    <section id="section-resultat" class="carte" hidden>
+      <h2>Détail de la cotation</h2>
+
+      <!-- Ligne de résumé : trajet, distance, poids retenu -->
+      <p id="resume-trajet"></p>
+      <p id="resume-poids"></p>
+
+      <!--
+        Un <table> est ici sémantiquement juste : on affiche bien des données
+        tabulaires (des lignes de facturation), pas une mise en page.
+        Utiliser un tableau pour positionner des éléments serait une faute ;
+        l'utiliser pour des données comme ici est le bon usage.
+      -->
+      <table>
+        <!-- <thead> : les en-têtes de colonnes -->
+        <thead>
+          <tr>
+            <th scope="col">Poste</th>
+            <th scope="col">Base de calcul</th>
+            <th scope="col">Montant</th>
+          </tr>
+        </thead>
+
+        <!-- <tbody> vide : c'est le JavaScript qui créera les lignes -->
+        <tbody id="corps-detail"></tbody>
+
+        <!-- <tfoot> : le pied du tableau, réservé au total -->
+        <tfoot>
+          <tr>
+            <th scope="row" colspan="2">Total à facturer</th>
+            <td id="cellule-total"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </section>
+
+  </main>
+
+  <!--
+    On charge le script à la FIN du <body>, juste avant </body>.
+    Pourquoi : le navigateur lit la page de haut en bas. Si le script était
+    dans le <head>, il s'exécuterait avant que le formulaire existe,
+    et ne le trouverait pas.
+  -->
+  <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+# Fichiers système Windows / macOS
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Dossiers d'éditeurs de code
+.vscode/
+.idea/
+
+# Secrets — À NE JAMAIS COMMITER
+# Ce fichier contiendra la clé API Mistral à l'étape 5.
+# Une clé poussée sur GitHub, même supprimée ensuite, reste dans
+# l'historique du dépôt : elle est considérée comme compromise.
+.env
+*.env
+
+# Dépendances Node.js (étape 5, dossier server/)
+# node_modules/ pèse des dizaines de Mo et se réinstalle avec "npm install".
+node_modules/
+npm-debug.log
