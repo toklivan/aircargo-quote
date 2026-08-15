@@ -2,10 +2,11 @@
   AirCargo Quote — moteur de cotation
   ------------------------------------
   Organisation du fichier, dans cet ordre :
-    1. Les données      (tarifs, distances, coefficients)
+    1. Les données               (aéroports, tarifs, distances, coefficients)
     2. Les fonctions de calcul   -> ne touchent JAMAIS à la page
     3. Les fonctions d'affichage -> ne calculent JAMAIS rien
-    4. Le branchement du formulaire
+    4. La construction du formulaire (listes générées depuis les données)
+    5. Le branchement du formulaire
 
   Cette séparation calcul / affichage est volontaire : la logique de pricing
   pourrait être déplacée telle quelle sur un serveur sans rien réécrire.
@@ -19,6 +20,25 @@
 /* ============================================================
    1. LES DONNÉES
    ============================================================ */
+
+/*
+  Les aéroports desservis.
+  Cette table est désormais la SEULE source de vérité : les listes
+  déroulantes du formulaire sont générées à partir d'elle au chargement
+  de la page. Ajouter un aéroport = ajouter une ligne ici, et c'est tout.
+
+  Avant ce refactoring, la liste existait en double (dans le HTML et ici) :
+  il fallait penser à modifier les deux, sous peine d'incohérence silencieuse.
+*/
+const AEROPORTS = {
+  CDG: "Paris Charles de Gaulle",
+  MRS: "Marseille Provence",
+  LGG: "Liège",
+  JFK: "New York",
+  DXB: "Dubaï",
+  HKG: "Hong Kong",
+  SIN: "Singapour"
+};
 
 /*
   Table des distances entre aéroports, en kilomètres.
@@ -58,25 +78,26 @@ const TARIF_PAR_KM = 0.00040;
 // Fixes et non proportionnels : traiter un dossier coûte pareil quel que soit le poids.
 const FRAIS_DE_DOSSIER = 45;
 
-// Majorations selon le type de marchandise, exprimées en pourcentage du prix de base.
-// 0.15 = +15 %. Une marchandise dangereuse demande un traitement DGR, du personnel
-// certifié et des contraintes de chargement : c'est la majoration la plus forte.
-const MAJORATIONS_TYPE = {
-  standard:   0,
-  fragile:    0.15,
-  perissable: 0.20,
-  dangereuse: 0.40
-};
+/*
+  Les types de marchandise.
 
-// Libellés lisibles, pour l'affichage uniquement.
-// On sépare la valeur technique ("perissable", sans accent, utilisée comme clé)
-// du texte montré à l'utilisateur ("Périssable"). Mélanger les deux oblige
-// à toucher au calcul dès qu'on veut corriger une faute d'orthographe.
-const LIBELLES_TYPE = {
-  standard:   "Standard",
-  fragile:    "Fragile",
-  perissable: "Périssable",
-  dangereuse: "Dangereuse (DGR)"
+  Une seule table qui porte À LA FOIS le libellé affiché et la majoration.
+  Avant, ces deux informations vivaient dans deux objets séparés : ajouter
+  un type imposait de modifier deux endroits, avec le risque d'en oublier un.
+
+  On accède aux valeurs avec un point :
+    TYPES_MARCHANDISE.fragile.majoration  vaut 0.15
+    TYPES_MARCHANDISE.fragile.libelle     vaut "Fragile"
+
+  La majoration s'exprime en pourcentage du prix de base (0.15 = +15 %).
+  Une marchandise dangereuse demande un traitement DGR et du personnel
+  certifié : c'est la majoration la plus forte.
+*/
+const TYPES_MARCHANDISE = {
+  standard:   { libelle: "Standard",         majoration: 0    },
+  fragile:    { libelle: "Fragile",          majoration: 0.15 },
+  perissable: { libelle: "Périssable",       majoration: 0.20 },
+  dangereuse: { libelle: "Dangereuse (DGR)", majoration: 0.40 }
 };
 
 // Une expédition à moins de 5 jours mobilise de la capacité en urgence.
@@ -154,7 +175,7 @@ function calculerCotation(expedition) {
   const prixDeBase = poidsTaxable * tarifParKg;
 
   // Majoration liée au type de marchandise
-  const tauxType = MAJORATIONS_TYPE[expedition.type];
+  const tauxType = TYPES_MARCHANDISE[expedition.type].majoration;
   const montantType = prixDeBase * tauxType;
 
   // Majoration liée à l'urgence
@@ -274,7 +295,7 @@ function afficherCotation(cotation) {
       cotation.prixDeBase
     ),
     creerLigneDetail(
-      `Majoration marchandise — ${LIBELLES_TYPE[cotation.type]}`,
+      `Majoration marchandise — ${TYPES_MARCHANDISE[cotation.type].libelle}`,
       cotation.tauxType === 0 ? "aucune" : `+${cotation.tauxType * 100} % du transport`,
       cotation.montantType
     ),
@@ -316,7 +337,71 @@ function masquerErreur() {
 
 
 /* ============================================================
-   4. LE BRANCHEMENT DU FORMULAIRE
+   4. LA CONSTRUCTION DU FORMULAIRE
+   ============================================================ */
+
+/*
+  Remplit une liste déroulante à partir d'un objet de données.
+
+  Paramètres :
+    - liste : l'élément <select> à remplir
+    - donnees : un objet dont chaque clé devient la valeur d'une <option>
+    - libelleDe : une fonction qui, pour une clé, renvoie le texte à afficher
+    - valeurParDefaut : la clé présélectionnée à l'ouverture
+
+  ⚠️ Passer une FONCTION en paramètre (libelleDe) est un cran au-dessus
+  du reste du fichier. C'est justifié ici : les deux tables n'ont pas la
+  même forme (AEROPORTS contient du texte, TYPES_MARCHANDISE contient des
+  objets), et ça évite d'écrire deux fonctions presque identiques.
+*/
+function remplirListe(liste, donnees, libelleDe, valeurParDefaut) {
+  // Object.keys(objet) renvoie un tableau des clés :
+  // pour AEROPORTS, ça donne ["CDG", "MRS", "LGG", ...]
+  const options = Object.keys(donnees).map(function (cle) {
+    const option = document.createElement("option");
+    option.value = cle;                  // la valeur lue par le JavaScript
+    option.textContent = libelleDe(cle); // le texte vu par l'utilisateur
+    return option;
+  });
+
+  // map() parcourt un tableau et en renvoie un NOUVEAU, transformé.
+  // Ici : un tableau de clés devient un tableau d'éléments <option>.
+  liste.replaceChildren(...options);
+  liste.value = valeurParDefaut;
+}
+
+// On remplit les trois listes au chargement de la page.
+remplirListe(
+  document.querySelector("#depart"),
+  AEROPORTS,
+  (code) => `${code} — ${AEROPORTS[code]}`,
+  "CDG"
+);
+
+remplirListe(
+  document.querySelector("#arrivee"),
+  AEROPORTS,
+  (code) => `${code} — ${AEROPORTS[code]}`,
+  "HKG"
+);
+
+remplirListe(
+  document.querySelector("#type"),
+  TYPES_MARCHANDISE,
+  (cle) => TYPES_MARCHANDISE[cle].libelle,
+  "standard"
+);
+
+/*
+  La syntaxe (code) => ... s'appelle une "fonction fléchée".
+  C'est une écriture courte de function (code) { return ...; }
+  Très répandue en JavaScript moderne, elle sert surtout quand on passe
+  une petite fonction en paramètre, comme ici.
+*/
+
+
+/* ============================================================
+   5. LE BRANCHEMENT DU FORMULAIRE
    ============================================================ */
 
 const formulaire = document.querySelector("#formulaire-cotation");
