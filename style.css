@@ -1,0 +1,359 @@
+/*
+  AirCargo Quote — feuille de style
+  ----------------------------------
+  Organisation du fichier :
+    1. Les variables (la palette et les mesures, définies une seule fois)
+    2. La base    (réglages généraux de la page)
+    3. La mise en page
+    4. Le formulaire
+    5. Le tableau de cotation
+    6. Les messages d'erreur
+    7. L'adaptation mobile
+*/
+
+
+/* ============================================================
+   1. LES VARIABLES
+   ============================================================ */
+
+/*
+  :root désigne la racine du document (la balise <html>).
+  Les noms qui commencent par -- sont des VARIABLES CSS : on définit une
+  valeur ici, et on l'utilise partout ailleurs avec var(--nom).
+
+  Intérêt concret : pour changer le bleu de toute l'application,
+  on modifie UNE ligne au lieu de chercher #0B2A45 dans tout le fichier.
+  C'est le même principe que les constantes en haut de script.js.
+*/
+:root {
+  --marine:      #0B2A45;  /* en-tête, titres, total */
+  --bleu-acier:  #1B5E8C;  /* accents, focus */
+  --gris-fond:   #F4F6F8;  /* fond de page */
+  --gris-bord:   #D5DCE3;  /* bordures, séparateurs */
+  --gris-texte:  #5A6B7A;  /* textes secondaires */
+  --rouge:       #B23A2E;  /* erreurs uniquement */
+  --blanc:       #FFFFFF;
+
+  --rayon: 4px;            /* arrondi des angles, discret */
+  --espace: 16px;          /* unité d'espacement de référence */
+}
+
+
+/* ============================================================
+   2. LA BASE
+   ============================================================ */
+
+/*
+  Le sélecteur * s'applique à TOUS les éléments.
+
+  box-sizing: border-box change la façon dont les largeurs sont calculées :
+  par défaut, un élément large de 200px avec 20px de padding occupe en réalité
+  240px. Avec border-box, il occupe exactement 200px, padding compris.
+  C'est bien plus intuitif — cette règle est le premier réflexe de tout
+  développeur front, on la met dans quasiment chaque projet.
+*/
+* {
+  box-sizing: border-box;
+}
+
+body {
+  /*
+    Pile de polices système : le navigateur prend la première police
+    disponible sur la machine. Aucune requête réseau, affichage instantané,
+    et un rendu natif sur chaque système d'exploitation.
+    C'est un choix assumé : une police externe ajouterait une dépendance
+    et un risque de texte qui saute au chargement.
+  */
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;        /* hauteur de ligne = 1,5 × la taille du texte */
+  color: var(--marine);
+  background-color: var(--gris-fond);
+  margin: 0;               /* le navigateur met une marge par défaut, on l'enlève */
+}
+
+h1, h2 {
+  margin: 0;
+  font-weight: 600;        /* semi-gras : plus sobre que le gras par défaut (700) */
+}
+
+h1 {
+  font-size: 20px;
+  letter-spacing: 0.02em;  /* léger espacement des lettres, plus posé */
+}
+
+h2 {
+  font-size: 15px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--gris-texte);
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--gris-bord);
+  margin-bottom: var(--espace);
+}
+
+
+/* ============================================================
+   3. LA MISE EN PAGE
+   ============================================================ */
+
+header {
+  background-color: var(--marine);
+  color: var(--blanc);
+  padding: 20px var(--espace);
+}
+
+header p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #9FB3C4;          /* bleu-gris clair, lisible sur le marine */
+}
+
+/*
+  display: grid transforme <main> en grille.
+  grid-template-columns définit les colonnes : ici deux colonnes de largeurs
+  380px et "1fr" (fr = fraction : cette colonne prend tout l'espace restant).
+  gap : l'espace entre les colonnes.
+
+  Résultat : le formulaire à gauche, la cotation à droite — le résultat
+  s'affiche sans avoir à faire défiler la page.
+*/
+main {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: var(--espace);
+  align-items: start;      /* les deux colonnes démarrent en haut */
+
+  max-width: 1100px;       /* au-delà, le texte deviendrait pénible à lire */
+  margin: 24px auto;       /* "auto" à gauche et à droite = centré */
+  padding: 0 var(--espace);
+}
+
+/* .carte : le fond blanc encadré commun au formulaire et au résultat */
+.carte {
+  background-color: var(--blanc);
+  border: 1px solid var(--gris-bord);
+  border-radius: var(--rayon);
+  padding: 20px;
+}
+
+
+/* ============================================================
+   4. LE FORMULAIRE
+   ============================================================ */
+
+.champ {
+  margin-bottom: 14px;
+}
+
+/*
+  display: block met le label sur sa propre ligne, au-dessus du champ.
+  Par défaut un <label> est "inline" et resterait collé à côté.
+*/
+.champ label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gris-texte);
+  margin-bottom: 5px;
+}
+
+/*
+  On liste les trois types de champs ensemble, séparés par des virgules :
+  la règle s'applique aux trois. Ça évite d'écrire le même bloc trois fois.
+*/
+.champ input,
+.champ select {
+  width: 100%;
+  padding: 9px 10px;
+  font-family: inherit;    /* inherit : reprend la police du parent.        */
+  font-size: 14px;         /* Sans ça, les champs gardent la police par     */
+  color: var(--marine);    /* défaut du navigateur, différente du reste.    */
+  background-color: var(--blanc);
+  border: 1px solid var(--gris-bord);
+  border-radius: var(--rayon);
+}
+
+/*
+  :focus-visible cible l'élément actif UNIQUEMENT quand l'utilisateur
+  navigue au clavier (touche Tab), pas au clic de souris.
+  Garder un contour de focus visible est une exigence d'accessibilité :
+  sans lui, une personne qui navigue au clavier est perdue dans le formulaire.
+*/
+.champ input:focus-visible,
+.champ select:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--bleu-acier);
+  outline-offset: 1px;
+}
+
+button[type="submit"] {
+  width: 100%;
+  margin-top: 4px;
+  padding: 11px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--blanc);
+  background-color: var(--marine);
+  border: none;
+  border-radius: var(--rayon);
+  cursor: pointer;         /* le curseur devient une main au survol */
+
+  /* transition : anime le changement de couleur sur 0,15 seconde
+     au lieu de le faire brutalement. Discret mais perceptible. */
+  transition: background-color 0.15s;
+}
+
+/* :hover = au survol de la souris */
+button[type="submit"]:hover {
+  background-color: var(--bleu-acier);
+}
+
+
+/* ============================================================
+   5. LE TABLEAU DE COTATION
+   ============================================================ */
+
+/* Les deux lignes de résumé au-dessus du tableau */
+#resume-trajet {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+#resume-poids {
+  margin: 0 0 var(--espace);
+  font-size: 13px;
+  color: var(--gris-texte);
+}
+
+table {
+  width: 100%;
+  /*
+    border-collapse: collapse fusionne les bordures adjacentes des cellules.
+    Sans ça, chaque cellule garde sa propre bordure et on obtient des
+    doubles traits disgracieux entre les lignes.
+  */
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+th, td {
+  padding: 9px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--gris-bord);
+}
+
+/* Les en-têtes de colonnes */
+thead th {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--gris-texte);
+  border-bottom: 2px solid var(--gris-bord);
+}
+
+/*
+  La 2ᵉ colonne (base de calcul) : c'est la formule appliquée, pas une phrase.
+  On la met en gris et en petit pour qu'elle reste lisible sans concurrencer
+  les montants.
+*/
+tbody td:nth-child(2) {
+  font-size: 13px;
+  color: var(--gris-texte);
+}
+
+/*
+  LA COLONNE DES MONTANTS — le détail qui fait la différence.
+
+  text-align: right aligne les chiffres à droite : les unités, dizaines et
+  centaines se retrouvent les unes au-dessus des autres.
+
+  font-variant-numeric: tabular-nums force tous les chiffres à occuper la
+  même largeur. Dans une police normale le "1" est plus étroit que le "8",
+  ce qui décale légèrement les colonnes. Avec tabular-nums, l'alignement
+  est parfait — c'est ce qui fait qu'un tableau ressemble à un document
+  financier et non à une page web.
+*/
+tbody td:last-child,
+tfoot td {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;     /* interdit à "1 553,77 €" de se couper en deux */
+}
+
+/* Le pied de tableau : la ligne du total */
+tfoot th,
+tfoot td {
+  padding-top: 14px;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--marine);
+  border-bottom: none;
+  border-top: 2px solid var(--marine);
+}
+
+tfoot th {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+
+/* ============================================================
+   6. LES MESSAGES D'ERREUR
+   ============================================================ */
+
+/*
+  Le message est masqué par l'attribut "hidden" du HTML tant que le
+  JavaScript ne l'a pas retiré — aucun CSS n'est nécessaire pour le cacher.
+
+  ⚠️ ATTENTION, PIÈGE CLASSIQUE : si on écrivait "display: block" ici,
+  cette règle écraserait l'attribut hidden et le message serait TOUJOURS
+  visible. C'est une erreur fréquente et pénible à diagnostiquer.
+*/
+#message-erreur {
+  /* grid-column: 1 / -1 : occupe toute la largeur de la grille,
+     de la première colonne jusqu'à la dernière. */
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 11px var(--espace);
+  font-size: 14px;
+  color: var(--rouge);
+  background-color: #FBEEEC;
+  border: 1px solid var(--rouge);
+  border-radius: var(--rayon);
+}
+
+
+/* ============================================================
+   7. L'ADAPTATION MOBILE
+   ============================================================ */
+
+/*
+  Une media query applique des règles seulement dans certaines conditions.
+  Ici : "si la fenêtre fait 820px de large ou moins".
+
+  Sur mobile, deux colonnes seraient illisibles : on repasse en une seule,
+  le formulaire au-dessus et la cotation en dessous.
+*/
+@media (max-width: 820px) {
+  main {
+    grid-template-columns: 1fr;   /* une seule colonne */
+    margin-top: var(--espace);
+  }
+}
+
+/*
+  Respect de la préférence système "réduire les animations".
+  Certaines personnes désactivent les animations pour des raisons médicales
+  (troubles vestibulaires, migraines). Cette règle honore ce réglage.
+  Deux lignes, et c'est une exigence d'accessibilité réelle.
+*/
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none;
+  }
+}
