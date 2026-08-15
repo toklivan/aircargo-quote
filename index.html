@@ -91,7 +91,14 @@
       </form>
     </section>
 
-    <!-- ===== SECTION 2 : LE RÉSULTAT ===== -->
+    <!--
+      La colonne de droite regroupe tout ce que le JavaScript produit :
+      les erreurs, la cotation en cours, et l'historique.
+      Sans ce conteneur, la grille placerait ces blocs n'importe où selon
+      qu'ils sont visibles ou masqués — le résultat sauterait d'une colonne
+      à l'autre. Un conteneur explicite rend la mise en page prévisible.
+    -->
+    <div class="colonne-droite">
 
     <!--
       role="alert" : indique aux lecteurs d'écran que ce message doit être
@@ -135,6 +142,29 @@
         </tfoot>
       </table>
     </section>
+
+    <!-- ===== L'HISTORIQUE ===== -->
+    <section id="section-historique" class="carte">
+
+      <div class="entete-historique">
+        <h2>Historique</h2>
+        <!--
+          type="button" : ESSENTIEL. Un <button> placé dans ou près d'un
+          formulaire est de type "submit" par défaut et déclencherait
+          l'envoi du formulaire. Ici on veut juste exécuter du JavaScript.
+        -->
+        <button type="button" id="bouton-vider" hidden>Tout supprimer</button>
+      </div>
+
+      <!-- Message affiché quand l'historique est vide : un écran vide sans
+           explication laisse l'utilisateur se demander si l'outil a bugué. -->
+      <p id="historique-vide">Aucune cotation enregistrée pour le moment.</p>
+
+      <!-- <ul> : une liste. Les <li> sont créés par le JavaScript. -->
+      <ul id="liste-historique"></ul>
+    </section>
+
+    </div><!-- fin .colonne-droite -->
 
   </main>
 

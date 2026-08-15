@@ -401,7 +401,224 @@ remplirListe(
 
 
 /* ============================================================
-   5. LE BRANCHEMENT DU FORMULAIRE
+   5. L'HISTORIQUE
+   ============================================================ */
+
+/*
+  localStorage : un petit espace de stockage fourni par le navigateur,
+  propre à ce site, qui survit à la fermeture de l'onglet.
+
+  Sa limite : il ne stocke QUE du texte. On convertit donc nos objets :
+    - JSON.stringify(objet)  -> transforme un objet en texte
+    - JSON.parse(texte)      -> refait le chemin inverse
+
+  La clé sert d'étiquette pour retrouver nos données parmi celles
+  d'éventuelles autres applications du même domaine.
+*/
+const CLE_STOCKAGE = "aircargo-quote:historique";
+
+// Le tableau des cotations, gardé en mémoire pendant l'utilisation.
+// Le localStorage en est la copie persistante.
+let historique = [];
+
+const listeHistorique  = document.querySelector("#liste-historique");
+const historiqueVide   = document.querySelector("#historique-vide");
+const boutonVider      = document.querySelector("#bouton-vider");
+
+/*
+  Lit l'historique depuis le localStorage.
+
+  try / catch : on TENTE le code du bloc "try" ; si une erreur survient,
+  au lieu de tout casser, le programme saute dans le bloc "catch".
+
+  Pourquoi c'est nécessaire ici : le stockage peut échouer pour des raisons
+  qui ne dépendent pas de nous (navigation privée, quota dépassé, données
+  corrompues par une ancienne version). Sans protection, une erreur au
+  chargement casserait TOUTE la page, formulaire compris.
+  Avec, l'application continue de calculer même sans historique.
+*/
+function chargerHistorique() {
+  try {
+    const texte = localStorage.getItem(CLE_STOCKAGE);
+
+    // getItem renvoie null si la clé n'existe pas encore (première visite).
+    if (texte === null) {
+      return [];
+    }
+
+    const donnees = JSON.parse(texte);
+
+    // Array.isArray : on vérifie qu'on a bien récupéré un tableau.
+    // Ne jamais faire confiance aveuglément à des données stockées :
+    // elles ont pu être modifiées à la main dans les outils du navigateur.
+    return Array.isArray(donnees) ? donnees : [];
+
+  } catch (erreur) {
+    // console.warn écrit dans la console du navigateur (touche F12).
+    // C'est destiné au développeur, pas à l'utilisateur.
+    console.warn("Historique illisible, on repart d'une liste vide.", erreur);
+    return [];
+  }
+}
+
+function sauvegarderHistorique() {
+  try {
+    localStorage.setItem(CLE_STOCKAGE, JSON.stringify(historique));
+  } catch (erreur) {
+    console.warn("Sauvegarde impossible.", erreur);
+  }
+}
+
+/*
+  Fabrique une ligne <li> de l'historique.
+
+  Chaque ligne contient deux boutons :
+    - un bouton "consulter" qui occupe toute la largeur
+    - un bouton "supprimer"
+
+  data-id : un attribut personnalisé (tout attribut commençant par "data-"
+  est autorisé en HTML). On y range l'identifiant de la cotation pour
+  savoir, au clic, de laquelle il s'agit. On le relit avec dataset.id.
+*/
+function creerLigneHistorique(cotation) {
+  const ligne = document.createElement("li");
+
+  const boutonConsulter = document.createElement("button");
+  boutonConsulter.type = "button";
+  boutonConsulter.className = "ligne-historique";
+  boutonConsulter.dataset.id = cotation.id;
+
+  // Le trajet, en gras
+  const trajet = document.createElement("span");
+  trajet.className = "histo-trajet";
+  trajet.textContent = `${cotation.depart} → ${cotation.arrivee}`;
+
+  // Le contexte, en petit et en gris
+  const details = document.createElement("span");
+  details.className = "histo-details";
+  details.textContent =
+    `${cotation.poidsTaxable.toFixed(0)} kg taxables · ${TYPES_MARCHANDISE[cotation.type].libelle}`;
+
+  const montant = document.createElement("span");
+  montant.className = "histo-montant";
+  montant.textContent = formaterEuros(cotation.total);
+
+  boutonConsulter.append(trajet, details, montant);
+
+  const boutonSupprimer = document.createElement("button");
+  boutonSupprimer.type = "button";
+  boutonSupprimer.className = "bouton-supprimer";
+  boutonSupprimer.dataset.supprimerId = cotation.id;
+  boutonSupprimer.textContent = "×";
+  // aria-label : le texte lu par un lecteur d'écran. Un "×" seul
+  // ne veut rien dire à l'oreille.
+  boutonSupprimer.setAttribute("aria-label", "Supprimer cette cotation");
+
+  ligne.append(boutonConsulter, boutonSupprimer);
+  return ligne;
+}
+
+/*
+  Redessine entièrement la liste à partir du tableau `historique`.
+  On ne modifie jamais une ligne existante : on repart des données et on
+  reconstruit. C'est plus simple à suivre et il n'y a pas de risque de
+  décalage entre ce qui est affiché et ce qui est stocké.
+*/
+function afficherHistorique() {
+  const estVide = historique.length === 0;
+
+  historiqueVide.hidden = !estVide;  // le ! inverse : vrai devient faux
+  boutonVider.hidden = estVide;
+
+  const lignes = historique.map(creerLigneHistorique);
+  listeHistorique.replaceChildren(...lignes);
+}
+
+/*
+  Ajoute une cotation en tête de liste.
+  unshift() insère au DÉBUT du tableau (push() ajouterait à la fin) :
+  la cotation la plus récente doit apparaître en premier.
+*/
+function ajouterAHistorique(cotation) {
+  historique.unshift(cotation);
+  sauvegarderHistorique();
+  afficherHistorique();
+}
+
+/*
+  DÉLÉGATION D'ÉVÉNEMENTS.
+
+  Plutôt que de poser un écouteur de clic sur chaque bouton de chaque ligne,
+  on en pose UN SEUL sur la liste entière, et on regarde d'où vient le clic.
+
+  Deux avantages concrets :
+    - ça fonctionne pour les lignes créées plus tard, qui n'existaient pas
+      au moment où l'écouteur a été posé
+    - un seul écouteur au lieu de deux par cotation
+
+  evenement.target = l'élément exactement cliqué.
+  closest("...") remonte les parents jusqu'à trouver un élément correspondant.
+  Nécessaire ici parce qu'un clic peut atterrir sur le <span> du montant,
+  et pas sur le <button> lui-même.
+*/
+listeHistorique.addEventListener("click", function (evenement) {
+
+  // Cas 1 : clic sur la croix de suppression
+  const cibleSuppression = evenement.target.closest(".bouton-supprimer");
+  if (cibleSuppression) {
+    const id = cibleSuppression.dataset.supprimerId;
+
+    // filter() renvoie un NOUVEAU tableau ne gardant que les éléments
+    // pour lesquels la condition est vraie : ici, tous sauf celui-là.
+    // Les id du dataset sont du texte, d'où String() pour comparer
+    // deux valeurs de même type.
+    historique = historique.filter((cotation) => String(cotation.id) !== id);
+
+    sauvegarderHistorique();
+    afficherHistorique();
+    return; // on s'arrête là, ce n'était pas une consultation
+  }
+
+  // Cas 2 : clic sur la ligne pour consulter
+  const cibleConsultation = evenement.target.closest(".ligne-historique");
+  if (cibleConsultation) {
+    const id = cibleConsultation.dataset.id;
+
+    // find() renvoie le PREMIER élément qui correspond, ou undefined.
+    const cotation = historique.find((c) => String(c.id) === id);
+
+    if (cotation) {
+      // On réutilise telle quelle la fonction d'affichage de l'étape 2.
+      // C'est le bénéfice direct d'avoir séparé calcul et affichage :
+      // afficherCotation() ne se soucie pas de savoir si la cotation
+      // vient d'être calculée ou sort du stockage.
+      afficherCotation(cotation);
+    }
+  }
+});
+
+boutonVider.addEventListener("click", function () {
+  // confirm() ouvre une boîte de dialogue native et renvoie true ou false.
+  // ⚠️ RACCOURCI PÉDAGOGIQUE : confirm() bloque toute la page et ne peut
+  // pas être stylé. Une vraie application utiliserait une fenêtre modale
+  // maison. Ici, une confirmation avant une action irréversible vaut mieux
+  // qu'un design parfait — c'est le bon arbitrage pour une V1.
+  if (!confirm("Supprimer toutes les cotations enregistrées ?")) {
+    return;
+  }
+
+  historique = [];
+  sauvegarderHistorique();
+  afficherHistorique();
+});
+
+// Au chargement de la page, on restaure ce qui avait été enregistré.
+historique = chargerHistorique();
+afficherHistorique();
+
+
+/* ============================================================
+   6. LE BRANCHEMENT DU FORMULAIRE
    ============================================================ */
 
 const formulaire = document.querySelector("#formulaire-cotation");
@@ -446,5 +663,22 @@ formulaire.addEventListener("submit", function (evenement) {
   }
 
   const cotation = calculerCotation(expedition);
+
+  /*
+    On ajoute deux informations qui ne relèvent pas du calcul :
+    un identifiant unique et la date d'enregistrement.
+
+    Elles sont ajoutées ICI, et non dans calculerCotation(), pour garder
+    cette fonction "pure" : mêmes données en entrée, même résultat en sortie,
+    toujours. Date.now() changeant à chaque appel, l'y mettre rendrait la
+    fonction impossible à tester de façon fiable.
+
+    Date.now() renvoie le nombre de millisecondes écoulées depuis 1970 :
+    deux clics ne peuvent pas tomber sur la même valeur.
+  */
+  cotation.id = Date.now();
+  cotation.enregistreeLe = new Date().toISOString();
+
   afficherCotation(cotation);
+  ajouterAHistorique(cotation);
 });
