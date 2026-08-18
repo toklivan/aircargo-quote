@@ -8,7 +8,9 @@
     4. Le formulaire
     5. Le tableau de cotation
     6. Les messages d'erreur
-    7. L'adaptation mobile
+    7. L'historique
+    8. L'explication par l'IA
+    9. L'adaptation mobile
 */
 
 
@@ -127,6 +129,19 @@ main {
   max-width: 1100px;       /* au-delà, le texte deviendrait pénible à lire */
   margin: 24px auto;       /* "auto" à gauche et à droite = centré */
   padding: 0 var(--espace);
+}
+
+/*
+  La colonne de droite empile ses blocs verticalement.
+  display: flex avec flex-direction: column place les enfants les uns
+  sous les autres, et gap gère l'espace entre eux — plus fiable que
+  des margin qui se chevauchent.
+*/
+.colonne-droite {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espace);
+  min-width: 0;   /* évite qu'un contenu large fasse déborder la grille */
 }
 
 /* .carte : le fond blanc encadré commun au formulaire et au résultat */
@@ -315,9 +330,6 @@ tfoot th {
   visible. C'est une erreur fréquente et pénible à diagnostiquer.
 */
 #message-erreur {
-  /* grid-column: 1 / -1 : occupe toute la largeur de la grille,
-     de la première colonne jusqu'à la dernière. */
-  grid-column: 1 / -1;
   margin: 0;
   padding: 11px var(--espace);
   font-size: 14px;
@@ -329,7 +341,206 @@ tfoot th {
 
 
 /* ============================================================
-   7. L'ADAPTATION MOBILE
+   7. L'HISTORIQUE
+   ============================================================ */
+
+/*
+  En-tête de l'historique : le titre à gauche, le bouton à droite.
+  justify-content: space-between pousse les deux enfants aux extrémités.
+*/
+.entete-historique {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;   /* aligne sur la ligne de base du texte */
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--gris-bord);
+  margin-bottom: 12px;
+}
+
+/* Le h2 est déjà stylé plus haut : on annule ici sa bordure et sa marge,
+   c'est l'en-tête qui les porte désormais. */
+.entete-historique h2 {
+  padding-bottom: 0;
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+#bouton-vider {
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--rouge);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+#historique-vide {
+  margin: 0;
+  font-size: 13px;
+  color: var(--gris-texte);
+}
+
+/*
+  list-style: none retire les puces.
+  padding-left: 0 retire le retrait que le navigateur applique par défaut
+  aux listes — sans ça, tout le bloc serait décalé vers la droite.
+*/
+#liste-historique {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+#liste-historique li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--gris-bord);
+}
+
+/*
+  La ligne cliquable est un vrai <button> et non un <div> :
+  elle est ainsi accessible au clavier et annoncée comme cliquable
+  par les lecteurs d'écran, sans code supplémentaire.
+  On lui retire simplement son apparence de bouton.
+*/
+.ligne-historique {
+  flex: 1;                 /* prend tout l'espace disponible */
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0 12px;
+  padding: 10px 6px;
+  font-family: inherit;
+  font-size: 14px;
+  text-align: left;
+  color: var(--marine);
+  background: none;
+  border: none;
+  border-radius: var(--rayon);
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.ligne-historique:hover {
+  background-color: var(--gris-fond);
+}
+
+.histo-trajet {
+  font-weight: 600;
+}
+
+/*
+  grid-column: 1 place les détails sous le trajet, dans la 1ʳᵉ colonne.
+  Le montant, lui, occupe la 2ᵉ colonne sur les deux lignes.
+*/
+.histo-details {
+  grid-column: 1;
+  font-size: 12px;
+  color: var(--gris-texte);
+}
+
+.histo-montant {
+  grid-column: 2;
+  grid-row: 1 / 3;         /* de la ligne 1 à la ligne 3 : les deux lignes */
+  align-self: center;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.bouton-supprimer {
+  flex-shrink: 0;          /* ne rétrécit jamais, même si la place manque */
+  width: 26px;
+  height: 26px;
+  font-size: 17px;
+  line-height: 1;
+  color: var(--gris-texte);
+  background: none;
+  border: none;
+  border-radius: var(--rayon);
+  cursor: pointer;
+  transition: color 0.15s, background-color 0.15s;
+}
+
+.bouton-supprimer:hover {
+  color: var(--rouge);
+  background-color: #FBEEEC;
+}
+
+.ligne-historique:focus-visible,
+.bouton-supprimer:focus-visible,
+#bouton-vider:focus-visible {
+  outline: 2px solid var(--bleu-acier);
+  outline-offset: 1px;
+}
+
+
+/* ============================================================
+   8. L'EXPLICATION PAR L'IA
+   ============================================================ */
+
+.bloc-explication {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gris-bord);
+}
+
+#bouton-expliquer {
+  padding: 8px 14px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--bleu-acier);
+  background: none;
+  border: 1px solid var(--bleu-acier);
+  border-radius: var(--rayon);
+  cursor: pointer;
+  transition: color 0.15s, background-color 0.15s;
+}
+
+#bouton-expliquer:hover:not(:disabled) {
+  color: var(--blanc);
+  background-color: var(--bleu-acier);
+}
+
+/*
+  :disabled cible le bouton pendant l'appel au serveur.
+  cursor: not-allowed et l'opacité réduite disent visuellement
+  "attends, ça travaille" — sans ça l'utilisateur reclique.
+*/
+#bouton-expliquer:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+#bouton-expliquer:focus-visible {
+  outline: 2px solid var(--bleu-acier);
+  outline-offset: 1px;
+}
+
+#zone-explication {
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--marine);
+  background-color: var(--gris-fond);
+  border-left: 3px solid var(--bleu-acier);
+  border-radius: 0 var(--rayon) var(--rayon) 0;
+}
+
+/* Variante appliquée par le JavaScript en cas d'échec */
+#zone-explication.explication-erreur {
+  color: var(--rouge);
+  background-color: #FBEEEC;
+  border-left-color: var(--rouge);
+}
+
+
+/* ============================================================
+   9. L'ADAPTATION MOBILE
    ============================================================ */
 
 /*
