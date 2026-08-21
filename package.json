@@ -1,0 +1,9 @@
+{
+  "name": "aircargo-quote",
+  "version": "1.0.0",
+  "description": "Outil de cotation de fret aerien",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/calcul.test.js"
+  }
+}

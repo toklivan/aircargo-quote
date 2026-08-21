@@ -1,0 +1,40 @@
+# Intégration continue
+# ---------------------
+# Ce fichier décrit un "workflow" : une suite d'étapes que GitHub exécute
+# automatiquement sur ses propres machines, à chaque envoi de code.
+#
+# Objectif : personne ne peut fusionner du code qui casse le calcul de prix
+# sans que ce soit visible. Le résultat s'affiche directement sur la page
+# de la pull request.
+#
+# Le format est du YAML : l'indentation définit la structure, comme en Python.
+
+name: Tests
+
+# "on" décrit CE QUI déclenche le workflow.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  tests:
+    # La machine virtuelle sur laquelle tourne le travail.
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Récupérer le code du dépôt sur la machine.
+      #    "uses" appelle une action déjà écrite et partagée par GitHub.
+      - uses: actions/checkout@v4
+
+      # 2. Installer Node.js dans la version voulue.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # 3. Lancer les tests.
+      #    Si un seul test échoue, l'étape échoue, et le workflow entier
+      #    est marqué en rouge sur GitHub.
+      - name: Lancer les tests unitaires
+        run: npm test
