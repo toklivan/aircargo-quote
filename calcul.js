@@ -22,21 +22,22 @@
 
 /*
   Les aéroports desservis.
-  Cette table est désormais la SEULE source de vérité : les listes
-  déroulantes du formulaire sont générées à partir d'elle au chargement
-  de la page. Ajouter un aéroport = ajouter une ligne ici, et c'est tout.
+  Cette table est la SEULE source de vérité : les listes déroulantes du
+  formulaire sont générées à partir d'elle au chargement de la page.
+  Ajouter un aéroport = ajouter une ligne ici, et c'est tout.
 
-  Avant ce refactoring, la liste existait en double (dans le HTML et ici) :
-  il fallait penser à modifier les deux, sous peine d'incohérence silencieuse.
+  Les noms ne sont pas traduits : dans l'aviation, les noms d'aéroports
+  s'emploient sous leur forme internationale, et c'est le code IATA qui
+  fait foi dans les documents de transport.
 */
 const AEROPORTS = {
   CDG: "Paris Charles de Gaulle",
   MRS: "Marseille Provence",
-  LGG: "Liège",
-  JFK: "New York",
-  DXB: "Dubaï",
+  LGG: "Liege",
+  JFK: "New York JFK",
+  DXB: "Dubai",
   HKG: "Hong Kong",
-  SIN: "Singapour"
+  SIN: "Singapore"
 };
 
 /*
@@ -80,23 +81,31 @@ const FRAIS_DE_DOSSIER = 45;
 /*
   Les types de marchandise.
 
-  Une seule table qui porte À LA FOIS le libellé affiché et la majoration.
-  Avant, ces deux informations vivaient dans deux objets séparés : ajouter
-  un type imposait de modifier deux endroits, avec le risque d'en oublier un.
-
-  On accède aux valeurs avec un point :
-    TYPES_MARCHANDISE.fragile.majoration  vaut 0.15
-    TYPES_MARCHANDISE.fragile.libelle     vaut "Fragile"
+  Chaque type porte sa majoration ET son libellé dans les deux langues.
+  Le libellé est un objet { fr, en } : on y accède avec
+  TYPES_MARCHANDISE.fragile.libelle[langue].
 
   La majoration s'exprime en pourcentage du prix de base (0.15 = +15 %).
   Une marchandise dangereuse demande un traitement DGR et du personnel
   certifié : c'est la majoration la plus forte.
 */
 const TYPES_MARCHANDISE = {
-  standard:   { libelle: "Standard",         majoration: 0    },
-  fragile:    { libelle: "Fragile",          majoration: 0.15 },
-  perissable: { libelle: "Périssable",       majoration: 0.20 },
-  dangereuse: { libelle: "Dangereuse (DGR)", majoration: 0.40 }
+  standard: {
+    libelle: { fr: "Standard", en: "General cargo" },
+    majoration: 0
+  },
+  fragile: {
+    libelle: { fr: "Fragile", en: "Fragile" },
+    majoration: 0.15
+  },
+  perissable: {
+    libelle: { fr: "Périssable", en: "Perishable" },
+    majoration: 0.20
+  },
+  dangereuse: {
+    libelle: { fr: "Dangereuse (DGR)", en: "Dangerous goods (DGR)" },
+    majoration: 0.40
+  }
 };
 
 // Une expédition à moins de 5 jours mobilise de la capacité en urgence.
