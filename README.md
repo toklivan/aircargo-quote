@@ -1,5 +1,7 @@
 # AirCargo Quote
 
+![Tests](https://github.com/toklivan/aircargo-quote/actions/workflows/tests.yml/badge.svg)
+
 Outil de cotation de fret aérien. Saisie d'une expédition, calcul du prix
 selon les règles tarifaires du secteur, et affichage du détail poste par poste.
 

@@ -13,7 +13,8 @@
     2. La construction du formulaire (listes générées depuis les données)
     3. L'historique              (localStorage)
     4. L'explication par l'IA    (appel à notre serveur proxy)
-    5. Le branchement du formulaire
+    5. Le devis imprimable
+    6. Le branchement du formulaire
 */
 
 "use strict";
@@ -96,6 +97,7 @@ function afficherCotation(cotation) {
 
   cotationAffichee = cotation;
   reinitialiserExplication(); // l'explication précédente ne vaut plus
+  remplirEnteteDevis(cotation);
 
   // --- Le résumé au-dessus du tableau ---
   resumeTrajet.textContent =
@@ -547,7 +549,94 @@ boutonExpliquer.addEventListener("click", demanderExplication);
 
 
 /* ============================================================
-   5. LE BRANCHEMENT DU FORMULAIRE
+   5. LE DEVIS IMPRIMABLE
+   ============================================================ */
+
+const boutonImprimer   = document.querySelector("#bouton-imprimer");
+const devisReference   = document.querySelector("#devis-reference");
+const devisDate        = document.querySelector("#devis-date");
+const devisValidite    = document.querySelector("#devis-validite");
+
+// Durée pendant laquelle le devis reste valable.
+// En fret aérien, les tarifs bougent constamment (carburant, capacité,
+// saisonnalité) : un devis sans date limite engagerait indéfiniment.
+const VALIDITE_DEVIS_JOURS = 7;
+
+/*
+  Fabrique une référence de devis à partir de l'identifiant de la cotation.
+  Format : AC-2026-0821-4471
+    AC   = préfixe de l'application
+    2026 = année, 0821 = mois et jour d'émission
+    4471 = les 4 derniers chiffres de l'identifiant
+
+  padStart(2, "0") complète avec des zéros à gauche : le mois 8 devient "08".
+  Sans ça, les références n'auraient pas toutes la même longueur.
+  getMonth() renvoie 0 pour janvier — d'où le + 1.
+*/
+function genererReference(identifiant) {
+  const date = new Date(identifiant);
+
+  const annee = date.getFullYear();
+  const mois  = String(date.getMonth() + 1).padStart(2, "0");
+  const jour  = String(date.getDate()).padStart(2, "0");
+
+  // slice(-4) prend les 4 derniers caractères.
+  const suffixe = String(identifiant).slice(-4);
+
+  return `AC-${annee}-${mois}${jour}-${suffixe}`;
+}
+
+/*
+  Formate une date au format français : 21/08/2026.
+  toLocaleDateString applique les conventions du pays demandé —
+  même principe qu'Intl.NumberFormat pour les montants.
+*/
+function formaterDate(date) {
+  return date.toLocaleDateString("fr-FR");
+}
+
+/*
+  Remplit l'en-tête du devis. Appelé à chaque affichage de cotation,
+  y compris pour une cotation ressortie de l'historique : la référence
+  doit rester CELLE D'ORIGINE et non être régénérée, sinon le même devis
+  changerait de numéro à chaque consultation.
+*/
+function remplirEnteteDevis(cotation) {
+  // Les cotations enregistrées avant l'ajout de cette fonctionnalité
+  // n'ont pas de date d'émission : on retombe sur leur identifiant.
+  const emission = cotation.enregistreeLe
+    ? new Date(cotation.enregistreeLe)
+    : new Date(cotation.id);
+
+  const expiration = new Date(emission);
+  expiration.setDate(expiration.getDate() + VALIDITE_DEVIS_JOURS);
+
+  devisReference.textContent = genererReference(cotation.id);
+  devisDate.textContent      = formaterDate(emission);
+  devisValidite.textContent  = formaterDate(expiration);
+}
+
+/*
+  window.print() ouvre la boîte de dialogue d'impression du navigateur.
+  L'utilisateur peut alors imprimer sur papier ou choisir
+  "Enregistrer au format PDF".
+
+  C'est la solution la plus simple et la plus fiable : aucune bibliothèque
+  de génération de PDF à installer, et le rendu est celui que l'utilisateur
+  voit dans l'aperçu avant de valider.
+
+  ⚠️ Une application professionnelle générerait souvent le PDF côté serveur,
+  pour garantir un rendu identique quel que soit le navigateur et pouvoir
+  archiver le document. Ici, l'impression navigateur est le bon arbitrage :
+  zéro dépendance pour un résultat correct.
+*/
+boutonImprimer.addEventListener("click", function () {
+  window.print();
+});
+
+
+/* ============================================================
+   6. LE BRANCHEMENT DU FORMULAIRE
    ============================================================ */
 
 const formulaire = document.querySelector("#formulaire-cotation");

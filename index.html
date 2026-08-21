@@ -108,6 +108,27 @@
     <p id="message-erreur" role="alert" hidden></p>
 
     <section id="section-resultat" class="carte" hidden>
+
+      <!--
+        EN-TÊTE DE DEVIS — visible uniquement à l'impression.
+        La classe .impression-seule est masquée à l'écran par le CSS,
+        et révélée dans le bloc @media print.
+        Un document imprimé doit se suffire à lui-même : sans émetteur,
+        référence ni date, la feuille est inexploitable une fois détachée
+        de l'écran qui l'a produite.
+      -->
+      <div class="impression-seule entete-devis">
+        <div class="devis-emetteur">
+          <strong>AirCargo Quote</strong><br>
+          Cotation de fret aérien
+        </div>
+        <div class="devis-references">
+          <div>Référence : <span id="devis-reference"></span></div>
+          <div>Émis le : <span id="devis-date"></span></div>
+          <div>Valable jusqu'au : <span id="devis-validite"></span></div>
+        </div>
+      </div>
+
       <h2>Détail de la cotation</h2>
 
       <!-- Ligne de résumé : trajet, distance, poids retenu -->
@@ -142,9 +163,12 @@
         </tfoot>
       </table>
 
-      <!-- ===== L'EXPLICATION PAR L'IA ===== -->
+      <!-- ===== ACTIONS ===== -->
       <div class="bloc-explication">
-        <button type="button" id="bouton-expliquer">Expliquer ce prix</button>
+        <div class="barre-actions">
+          <button type="button" id="bouton-expliquer">Expliquer ce prix</button>
+          <button type="button" id="bouton-imprimer">Imprimer le devis</button>
+        </div>
 
         <!--
           aria-live="polite" : prévient les lecteurs d'écran que le contenu
@@ -155,6 +179,19 @@
         -->
         <p id="zone-explication" aria-live="polite" hidden></p>
       </div>
+
+      <!--
+        MENTIONS — visibles uniquement à l'impression.
+        Les tarifs de ce projet sont fictifs : le document doit le dire.
+        Un devis qui laisserait croire à un engagement ferme alors qu'il
+        n'en est pas un poserait un vrai problème, pas un problème de forme.
+      -->
+      <p class="impression-seule devis-mentions">
+        Devis non contractuel, établi à titre indicatif. Tarifs hors taxes,
+        hors frais de douane et hors assurance. Sous réserve de disponibilité
+        de capacité à la date demandée et d'acceptation de la marchandise par
+        la compagnie. Document généré automatiquement — projet de démonstration.
+      </p>
     </section>
 
     <!-- ===== L'HISTORIQUE ===== -->
