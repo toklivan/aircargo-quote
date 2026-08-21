@@ -1,0 +1,12 @@
+{
+  "name": "aircargo-quote-server",
+  "version": "1.0.0",
+  "description": "Serveur proxy minimal : garde la cle API Mistral hors du navigateur",
+  "private": true,
+  "scripts": {
+    "start": "node --env-file=.env server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}

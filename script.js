@@ -1,196 +1,26 @@
 /*
-  AirCargo Quote — moteur de cotation
-  ------------------------------------
-  Organisation du fichier, dans cet ordre :
-    1. Les données      (tarifs, distances, coefficients)
-    2. Les fonctions de calcul   -> ne touchent JAMAIS à la page
-    3. Les fonctions d'affichage -> ne calculent JAMAIS rien
-    4. Le branchement du formulaire
+  AirCargo Quote — interface
+  ---------------------------
+  Ce fichier gère tout ce qui touche à la page : affichage, formulaire,
+  historique, appel au serveur.
 
-  Cette séparation calcul / affichage est volontaire : la logique de pricing
-  pourrait être déplacée telle quelle sur un serveur sans rien réécrire.
+  Le calcul du prix, lui, vit dans calcul.js, chargé juste avant celui-ci.
+  Les fonctions et constantes de calcul (calculerCotation, AEROPORTS,
+  TYPES_MARCHANDISE...) sont donc déjà disponibles ici.
+
+  Organisation du fichier :
+    1. L'affichage de la cotation
+    2. La construction du formulaire (listes générées depuis les données)
+    3. L'historique              (localStorage)
+    4. L'explication par l'IA    (appel à notre serveur proxy)
+    5. Le devis imprimable
+    6. Le branchement du formulaire
 */
 
-// "use strict" : active le mode strict de JavaScript. Il transforme certaines
-// erreurs silencieuses en vraies erreurs affichées dans la console. À garder toujours.
 "use strict";
 
-
 /* ============================================================
-   1. LES DONNÉES
-   ============================================================ */
-
-/*
-  Table des distances entre aéroports, en kilomètres.
-
-  C'est un OBJET JavaScript : une liste de paires "clé": valeur.
-  On accède à une valeur avec DISTANCES["CDG-JFK"], qui vaut 5837.
-
-  On ne stocke qu'un sens (CDG-JFK) et pas les deux (JFK-CDG) :
-  la fonction trouverDistance() s'occupe de chercher dans les deux ordres.
-  Ça divise la table par deux et évite les incohérences.
-
-  ⚠️ Ce sont des distances orthodromiques approximatives, arrondies.
-  Amélioration V2 possible : stocker les coordonnées GPS des aéroports
-  et calculer la distance avec la formule de Haversine.
-*/
-const DISTANCES = {
-  "CDG-MRS": 645,   "CDG-LGG": 335,   "CDG-JFK": 5837,  "CDG-DXB": 5240,
-  "CDG-HKG": 9630,  "CDG-SIN": 10730,
-  "MRS-LGG": 750,   "MRS-JFK": 6440,  "MRS-DXB": 4780,  "MRS-HKG": 9330,
-  "MRS-SIN": 10250,
-  "LGG-JFK": 5920,  "LGG-DXB": 4980,  "LGG-HKG": 9210,  "LGG-SIN": 10390,
-  "JFK-DXB": 11000, "JFK-HKG": 12960, "JFK-SIN": 15340,
-  "DXB-HKG": 5940,  "DXB-SIN": 5840,
-  "HKG-SIN": 2580
-};
-
-// Règle IATA : 1 m³ de fret aérien équivaut à 167 kg facturables.
-// C'est le cœur du métier : un avion vend du volume autant que de la masse.
-const KG_PAR_METRE_CUBE = 167;
-
-// Tarif au kilo = une part fixe + une part proportionnelle à la distance.
-// Exemple : CDG-HKG (9630 km) => 0.80 + (9630 × 0.00040) = 4.65 €/kg
-const TARIF_BASE_PAR_KG = 0.80;
-const TARIF_PAR_KM = 0.00040;
-
-// Frais fixes par expédition (ouverture de dossier, documentation, sûreté).
-// Fixes et non proportionnels : traiter un dossier coûte pareil quel que soit le poids.
-const FRAIS_DE_DOSSIER = 45;
-
-// Majorations selon le type de marchandise, exprimées en pourcentage du prix de base.
-// 0.15 = +15 %. Une marchandise dangereuse demande un traitement DGR, du personnel
-// certifié et des contraintes de chargement : c'est la majoration la plus forte.
-const MAJORATIONS_TYPE = {
-  standard:   0,
-  fragile:    0.15,
-  perissable: 0.20,
-  dangereuse: 0.40
-};
-
-// Libellés lisibles, pour l'affichage uniquement.
-// On sépare la valeur technique ("perissable", sans accent, utilisée comme clé)
-// du texte montré à l'utilisateur ("Périssable"). Mélanger les deux oblige
-// à toucher au calcul dès qu'on veut corriger une faute d'orthographe.
-const LIBELLES_TYPE = {
-  standard:   "Standard",
-  fragile:    "Fragile",
-  perissable: "Périssable",
-  dangereuse: "Dangereuse (DGR)"
-};
-
-// Une expédition à moins de 5 jours mobilise de la capacité en urgence.
-const DELAI_URGENCE_JOURS = 5;
-const MAJORATION_URGENCE = 0.25;
-
-
-/* ============================================================
-   2. LES FONCTIONS DE CALCUL
-   ============================================================ */
-
-/*
-  Cherche la distance entre deux aéroports, dans les deux sens.
-  Retourne le nombre de km, ou null si la liaison n'existe pas dans la table.
-*/
-function trouverDistance(depart, arrivee) {
-  // Les backticks ` ` permettent d'insérer des variables dans une chaîne
-  // avec ${...}. C'est plus lisible que depart + "-" + arrivee.
-  const allerRetour = DISTANCES[`${depart}-${arrivee}`];
-  const retourAller = DISTANCES[`${arrivee}-${depart}`];
-
-  if (allerRetour !== undefined) {
-    return allerRetour;
-  }
-  if (retourAller !== undefined) {
-    return retourAller;
-  }
-  return null; // liaison inconnue
-}
-
-/*
-  Calcule le nombre de jours entre aujourd'hui et la date souhaitée.
-
-  ⚠️ RACCOURCI PÉDAGOGIQUE : la manipulation des dates en JavaScript est un
-  sujet piégeux (fuseaux horaires, heure d'été). Ici on remet l'heure à minuit
-  des deux côtés pour comparer des journées entières, ce qui suffit largement.
-  Dans une vraie application, ce calcul se ferait côté serveur, ou avec une
-  bibliothèque dédiée comme date-fns.
-*/
-function calculerJoursAvantDepart(dateSouhaitee) {
-  const aujourdhui = new Date();
-  aujourdhui.setHours(0, 0, 0, 0); // heures, minutes, secondes, millisecondes
-
-  const depart = new Date(dateSouhaitee);
-  depart.setHours(0, 0, 0, 0);
-
-  const MILLISECONDES_PAR_JOUR = 1000 * 60 * 60 * 24;
-
-  // Soustraire deux dates en JS donne un écart en millisecondes.
-  // Math.round évite les 4.999999 dus aux arrondis.
-  return Math.round((depart - aujourdhui) / MILLISECONDES_PAR_JOUR);
-}
-
-/*
-  LE CŒUR DU PROJET.
-
-  Reçoit un objet "expedition" et retourne un objet contenant TOUT le détail
-  du calcul, pas seulement le total. C'est volontaire : une cotation doit être
-  auditable ligne par ligne, un commercial doit pouvoir justifier chaque euro.
-
-  Cette fonction ne touche pas à la page HTML : elle prend des données,
-  elle rend des données.
-*/
-function calculerCotation(expedition) {
-  const distance = trouverDistance(expedition.depart, expedition.arrivee);
-
-  // Poids volumétrique : le volume converti en kilos facturables.
-  const poidsVolumetrique = expedition.volume * KG_PAR_METRE_CUBE;
-
-  // Poids taxable : on retient le PLUS GRAND des deux.
-  // Math.max(a, b) renvoie le plus grand des deux nombres.
-  const poidsTaxable = Math.max(expedition.poids, poidsVolumetrique);
-
-  const tarifParKg = TARIF_BASE_PAR_KG + (distance * TARIF_PAR_KM);
-  const prixDeBase = poidsTaxable * tarifParKg;
-
-  // Majoration liée au type de marchandise
-  const tauxType = MAJORATIONS_TYPE[expedition.type];
-  const montantType = prixDeBase * tauxType;
-
-  // Majoration liée à l'urgence
-  const joursAvantDepart = calculerJoursAvantDepart(expedition.date);
-  const estUrgent = joursAvantDepart < DELAI_URGENCE_JOURS;
-  // L'opérateur ternaire "condition ? valeurSiVrai : valeurSiFaux"
-  // est un raccourci pour un if/else qui renvoie une valeur.
-  const montantUrgence = estUrgent ? prixDeBase * MAJORATION_URGENCE : 0;
-
-  const total = prixDeBase + montantType + montantUrgence + FRAIS_DE_DOSSIER;
-
-  // On renvoie un objet : toutes les valeurs intermédiaires sont conservées
-  // pour pouvoir les afficher dans le détail.
-  return {
-    depart: expedition.depart,
-    arrivee: expedition.arrivee,
-    distance: distance,
-    poidsReel: expedition.poids,
-    poidsVolumetrique: poidsVolumetrique,
-    poidsTaxable: poidsTaxable,
-    tarifParKg: tarifParKg,
-    prixDeBase: prixDeBase,
-    type: expedition.type,
-    tauxType: tauxType,
-    montantType: montantType,
-    joursAvantDepart: joursAvantDepart,
-    estUrgent: estUrgent,
-    montantUrgence: montantUrgence,
-    fraisDeDossier: FRAIS_DE_DOSSIER,
-    total: total
-  };
-}
-
-
-/* ============================================================
-   3. L'AFFICHAGE
+   1. L'AFFICHAGE
    ============================================================ */
 
 // On retrouve une fois pour toutes les éléments de la page qu'on va manipuler.
@@ -247,12 +77,27 @@ function creerLigneDetail(poste, baseDeCalcul, montant) {
 }
 
 /*
+  La cotation actuellement affichée à l'écran.
+  On la garde en mémoire pour pouvoir l'envoyer au serveur quand
+  l'utilisateur demande une explication.
+
+  Pourquoi ne pas relire les valeurs dans le tableau HTML ? Parce qu'on
+  y trouverait du texte formaté ("1 553,77 €") qu'il faudrait reconvertir
+  en nombres. L'affichage découle des données, jamais l'inverse.
+*/
+let cotationAffichee = null;
+
+/*
   Remplit toute la zone de résultat à partir d'une cotation.
   Cette fonction ne calcule rien : elle reçoit des chiffres déjà faits
   et se contente de les mettre en forme.
 */
 function afficherCotation(cotation) {
   masquerErreur();
+
+  cotationAffichee = cotation;
+  reinitialiserExplication(); // l'explication précédente ne vaut plus
+  remplirEnteteDevis(cotation);
 
   // --- Le résumé au-dessus du tableau ---
   resumeTrajet.textContent =
@@ -274,7 +119,7 @@ function afficherCotation(cotation) {
       cotation.prixDeBase
     ),
     creerLigneDetail(
-      `Majoration marchandise — ${LIBELLES_TYPE[cotation.type]}`,
+      `Majoration marchandise — ${TYPES_MARCHANDISE[cotation.type].libelle}`,
       cotation.tauxType === 0 ? "aucune" : `+${cotation.tauxType * 100} % du transport`,
       cotation.montantType
     ),
@@ -316,7 +161,482 @@ function masquerErreur() {
 
 
 /* ============================================================
-   4. LE BRANCHEMENT DU FORMULAIRE
+   2. LA CONSTRUCTION DU FORMULAIRE
+   ============================================================ */
+
+/*
+  Remplit une liste déroulante à partir d'un objet de données.
+
+  Paramètres :
+    - liste : l'élément <select> à remplir
+    - donnees : un objet dont chaque clé devient la valeur d'une <option>
+    - libelleDe : une fonction qui, pour une clé, renvoie le texte à afficher
+    - valeurParDefaut : la clé présélectionnée à l'ouverture
+
+  ⚠️ Passer une FONCTION en paramètre (libelleDe) est un cran au-dessus
+  du reste du fichier. C'est justifié ici : les deux tables n'ont pas la
+  même forme (AEROPORTS contient du texte, TYPES_MARCHANDISE contient des
+  objets), et ça évite d'écrire deux fonctions presque identiques.
+*/
+function remplirListe(liste, donnees, libelleDe, valeurParDefaut) {
+  // Object.keys(objet) renvoie un tableau des clés :
+  // pour AEROPORTS, ça donne ["CDG", "MRS", "LGG", ...]
+  const options = Object.keys(donnees).map(function (cle) {
+    const option = document.createElement("option");
+    option.value = cle;                  // la valeur lue par le JavaScript
+    option.textContent = libelleDe(cle); // le texte vu par l'utilisateur
+    return option;
+  });
+
+  // map() parcourt un tableau et en renvoie un NOUVEAU, transformé.
+  // Ici : un tableau de clés devient un tableau d'éléments <option>.
+  liste.replaceChildren(...options);
+  liste.value = valeurParDefaut;
+}
+
+// On remplit les trois listes au chargement de la page.
+remplirListe(
+  document.querySelector("#depart"),
+  AEROPORTS,
+  (code) => `${code} — ${AEROPORTS[code]}`,
+  "CDG"
+);
+
+remplirListe(
+  document.querySelector("#arrivee"),
+  AEROPORTS,
+  (code) => `${code} — ${AEROPORTS[code]}`,
+  "HKG"
+);
+
+remplirListe(
+  document.querySelector("#type"),
+  TYPES_MARCHANDISE,
+  (cle) => TYPES_MARCHANDISE[cle].libelle,
+  "standard"
+);
+
+/*
+  La syntaxe (code) => ... s'appelle une "fonction fléchée".
+  C'est une écriture courte de function (code) { return ...; }
+  Très répandue en JavaScript moderne, elle sert surtout quand on passe
+  une petite fonction en paramètre, comme ici.
+*/
+
+
+/* ============================================================
+   3. L'HISTORIQUE
+   ============================================================ */
+
+/*
+  localStorage : un petit espace de stockage fourni par le navigateur,
+  propre à ce site, qui survit à la fermeture de l'onglet.
+
+  Sa limite : il ne stocke QUE du texte. On convertit donc nos objets :
+    - JSON.stringify(objet)  -> transforme un objet en texte
+    - JSON.parse(texte)      -> refait le chemin inverse
+
+  La clé sert d'étiquette pour retrouver nos données parmi celles
+  d'éventuelles autres applications du même domaine.
+*/
+const CLE_STOCKAGE = "aircargo-quote:historique";
+
+// Le tableau des cotations, gardé en mémoire pendant l'utilisation.
+// Le localStorage en est la copie persistante.
+let historique = [];
+
+const listeHistorique  = document.querySelector("#liste-historique");
+const historiqueVide   = document.querySelector("#historique-vide");
+const boutonVider      = document.querySelector("#bouton-vider");
+
+/*
+  Lit l'historique depuis le localStorage.
+
+  try / catch : on TENTE le code du bloc "try" ; si une erreur survient,
+  au lieu de tout casser, le programme saute dans le bloc "catch".
+
+  Pourquoi c'est nécessaire ici : le stockage peut échouer pour des raisons
+  qui ne dépendent pas de nous (navigation privée, quota dépassé, données
+  corrompues par une ancienne version). Sans protection, une erreur au
+  chargement casserait TOUTE la page, formulaire compris.
+  Avec, l'application continue de calculer même sans historique.
+*/
+function chargerHistorique() {
+  try {
+    const texte = localStorage.getItem(CLE_STOCKAGE);
+
+    // getItem renvoie null si la clé n'existe pas encore (première visite).
+    if (texte === null) {
+      return [];
+    }
+
+    const donnees = JSON.parse(texte);
+
+    // Array.isArray : on vérifie qu'on a bien récupéré un tableau.
+    // Ne jamais faire confiance aveuglément à des données stockées :
+    // elles ont pu être modifiées à la main dans les outils du navigateur.
+    return Array.isArray(donnees) ? donnees : [];
+
+  } catch (erreur) {
+    // console.warn écrit dans la console du navigateur (touche F12).
+    // C'est destiné au développeur, pas à l'utilisateur.
+    console.warn("Historique illisible, on repart d'une liste vide.", erreur);
+    return [];
+  }
+}
+
+function sauvegarderHistorique() {
+  try {
+    localStorage.setItem(CLE_STOCKAGE, JSON.stringify(historique));
+  } catch (erreur) {
+    console.warn("Sauvegarde impossible.", erreur);
+  }
+}
+
+/*
+  Fabrique une ligne <li> de l'historique.
+
+  Chaque ligne contient deux boutons :
+    - un bouton "consulter" qui occupe toute la largeur
+    - un bouton "supprimer"
+
+  data-id : un attribut personnalisé (tout attribut commençant par "data-"
+  est autorisé en HTML). On y range l'identifiant de la cotation pour
+  savoir, au clic, de laquelle il s'agit. On le relit avec dataset.id.
+*/
+function creerLigneHistorique(cotation) {
+  const ligne = document.createElement("li");
+
+  const boutonConsulter = document.createElement("button");
+  boutonConsulter.type = "button";
+  boutonConsulter.className = "ligne-historique";
+  boutonConsulter.dataset.id = cotation.id;
+
+  // Le trajet, en gras
+  const trajet = document.createElement("span");
+  trajet.className = "histo-trajet";
+  trajet.textContent = `${cotation.depart} → ${cotation.arrivee}`;
+
+  // Le contexte, en petit et en gris
+  const details = document.createElement("span");
+  details.className = "histo-details";
+  details.textContent =
+    `${cotation.poidsTaxable.toFixed(0)} kg taxables · ${TYPES_MARCHANDISE[cotation.type].libelle}`;
+
+  const montant = document.createElement("span");
+  montant.className = "histo-montant";
+  montant.textContent = formaterEuros(cotation.total);
+
+  boutonConsulter.append(trajet, details, montant);
+
+  const boutonSupprimer = document.createElement("button");
+  boutonSupprimer.type = "button";
+  boutonSupprimer.className = "bouton-supprimer";
+  boutonSupprimer.dataset.supprimerId = cotation.id;
+  boutonSupprimer.textContent = "×";
+  // aria-label : le texte lu par un lecteur d'écran. Un "×" seul
+  // ne veut rien dire à l'oreille.
+  boutonSupprimer.setAttribute("aria-label", "Supprimer cette cotation");
+
+  ligne.append(boutonConsulter, boutonSupprimer);
+  return ligne;
+}
+
+/*
+  Redessine entièrement la liste à partir du tableau `historique`.
+  On ne modifie jamais une ligne existante : on repart des données et on
+  reconstruit. C'est plus simple à suivre et il n'y a pas de risque de
+  décalage entre ce qui est affiché et ce qui est stocké.
+*/
+function afficherHistorique() {
+  const estVide = historique.length === 0;
+
+  historiqueVide.hidden = !estVide;  // le ! inverse : vrai devient faux
+  boutonVider.hidden = estVide;
+
+  const lignes = historique.map(creerLigneHistorique);
+  listeHistorique.replaceChildren(...lignes);
+}
+
+/*
+  Ajoute une cotation en tête de liste.
+  unshift() insère au DÉBUT du tableau (push() ajouterait à la fin) :
+  la cotation la plus récente doit apparaître en premier.
+*/
+function ajouterAHistorique(cotation) {
+  historique.unshift(cotation);
+  sauvegarderHistorique();
+  afficherHistorique();
+}
+
+/*
+  DÉLÉGATION D'ÉVÉNEMENTS.
+
+  Plutôt que de poser un écouteur de clic sur chaque bouton de chaque ligne,
+  on en pose UN SEUL sur la liste entière, et on regarde d'où vient le clic.
+
+  Deux avantages concrets :
+    - ça fonctionne pour les lignes créées plus tard, qui n'existaient pas
+      au moment où l'écouteur a été posé
+    - un seul écouteur au lieu de deux par cotation
+
+  evenement.target = l'élément exactement cliqué.
+  closest("...") remonte les parents jusqu'à trouver un élément correspondant.
+  Nécessaire ici parce qu'un clic peut atterrir sur le <span> du montant,
+  et pas sur le <button> lui-même.
+*/
+listeHistorique.addEventListener("click", function (evenement) {
+
+  // Cas 1 : clic sur la croix de suppression
+  const cibleSuppression = evenement.target.closest(".bouton-supprimer");
+  if (cibleSuppression) {
+    const id = cibleSuppression.dataset.supprimerId;
+
+    // filter() renvoie un NOUVEAU tableau ne gardant que les éléments
+    // pour lesquels la condition est vraie : ici, tous sauf celui-là.
+    // Les id du dataset sont du texte, d'où String() pour comparer
+    // deux valeurs de même type.
+    historique = historique.filter((cotation) => String(cotation.id) !== id);
+
+    sauvegarderHistorique();
+    afficherHistorique();
+    return; // on s'arrête là, ce n'était pas une consultation
+  }
+
+  // Cas 2 : clic sur la ligne pour consulter
+  const cibleConsultation = evenement.target.closest(".ligne-historique");
+  if (cibleConsultation) {
+    const id = cibleConsultation.dataset.id;
+
+    // find() renvoie le PREMIER élément qui correspond, ou undefined.
+    const cotation = historique.find((c) => String(c.id) === id);
+
+    if (cotation) {
+      // On réutilise telle quelle la fonction d'affichage de l'étape 2.
+      // C'est le bénéfice direct d'avoir séparé calcul et affichage :
+      // afficherCotation() ne se soucie pas de savoir si la cotation
+      // vient d'être calculée ou sort du stockage.
+      afficherCotation(cotation);
+    }
+  }
+});
+
+boutonVider.addEventListener("click", function () {
+  // confirm() ouvre une boîte de dialogue native et renvoie true ou false.
+  // ⚠️ RACCOURCI PÉDAGOGIQUE : confirm() bloque toute la page et ne peut
+  // pas être stylé. Une vraie application utiliserait une fenêtre modale
+  // maison. Ici, une confirmation avant une action irréversible vaut mieux
+  // qu'un design parfait — c'est le bon arbitrage pour une V1.
+  if (!confirm("Supprimer toutes les cotations enregistrées ?")) {
+    return;
+  }
+
+  historique = [];
+  sauvegarderHistorique();
+  afficherHistorique();
+});
+
+// Au chargement de la page, on restaure ce qui avait été enregistré.
+historique = chargerHistorique();
+afficherHistorique();
+
+
+/* ============================================================
+   4. L'EXPLICATION PAR L'IA
+   ============================================================ */
+
+const boutonExpliquer = document.querySelector("#bouton-expliquer");
+const zoneExplication = document.querySelector("#zone-explication");
+
+/*
+  Remet le bloc à zéro. Appelé à chaque nouvel affichage de cotation :
+  laisser l'explication de la cotation précédente sous les chiffres de
+  la nouvelle serait une erreur grave dans un outil de pricing.
+*/
+function reinitialiserExplication() {
+  zoneExplication.hidden = true;
+  zoneExplication.textContent = "";
+  zoneExplication.classList.remove("explication-erreur");
+  boutonExpliquer.disabled = false;
+  boutonExpliquer.textContent = "Expliquer ce prix";
+}
+
+function afficherErreurExplication(message) {
+  zoneExplication.textContent = message;
+  // classList.add ajoute une classe CSS à l'élément, ce qui permet
+  // de le styler différemment (ici, en rouge).
+  zoneExplication.classList.add("explication-erreur");
+  zoneExplication.hidden = false;
+}
+
+/*
+  Demande l'explication au serveur.
+
+  async : la fonction contient des "await", donc des pauses en attendant
+  une réponse réseau. Le reste de la page continue de fonctionner pendant
+  l'attente — rien n'est gelé.
+*/
+async function demanderExplication() {
+  if (!cotationAffichee) {
+    return;
+  }
+
+  /*
+    ÉTAT "CHARGEMENT".
+    On désactive le bouton et on le dit à l'utilisateur.
+
+    Deux raisons, pas une :
+    - sans retour visuel, l'utilisateur clique plusieurs fois en croyant
+      que rien ne se passe
+    - chaque clic déclenche un appel facturé au modèle
+  */
+  boutonExpliquer.disabled = true;
+  boutonExpliquer.textContent = "Analyse en cours…";
+  zoneExplication.hidden = true;
+  zoneExplication.classList.remove("explication-erreur");
+
+  try {
+    /*
+      fetch envoie la requête à NOTRE serveur, pas à Mistral.
+      L'adresse est relative ("/api/expliquer") : elle vise automatiquement
+      le serveur qui a servi la page. Aucune adresse en dur à changer
+      le jour d'une mise en ligne.
+    */
+    const reponse = await fetch("/api/expliquer", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(cotationAffichee)
+    });
+
+    // .ok est vrai si le code HTTP est un succès (200 à 299).
+    if (!reponse.ok) {
+      const donnees = await reponse.json().catch(() => ({}));
+      afficherErreurExplication(donnees.erreur || "Explication indisponible.");
+      return;
+    }
+
+    const donnees = await reponse.json();
+
+    /*
+      textContent et non innerHTML.
+      Ce texte vient d'un modèle de langage : c'est du contenu qu'on ne
+      contrôle pas. L'interpréter comme du HTML ouvrirait une faille XSS.
+      C'est exactement le cas de figure évoqué plus tôt dans le projet.
+    */
+    zoneExplication.textContent = donnees.explication;
+    zoneExplication.hidden = false;
+
+  } catch (erreur) {
+    // Ce catch attrape les pannes réseau : serveur arrêté, connexion coupée.
+    console.error("Appel au serveur impossible :", erreur);
+    afficherErreurExplication(
+      "Serveur injoignable. Vérifie qu'il est bien démarré (npm start)."
+    );
+
+  } finally {
+    /*
+      finally s'exécute TOUJOURS, que le try ait réussi ou échoué.
+      C'est l'endroit correct pour réactiver le bouton : s'il était
+      réactivé seulement en cas de succès, la moindre erreur le laisserait
+      grisé définitivement.
+    */
+    boutonExpliquer.disabled = false;
+    boutonExpliquer.textContent = "Expliquer ce prix";
+  }
+}
+
+boutonExpliquer.addEventListener("click", demanderExplication);
+
+
+/* ============================================================
+   5. LE DEVIS IMPRIMABLE
+   ============================================================ */
+
+const boutonImprimer   = document.querySelector("#bouton-imprimer");
+const devisReference   = document.querySelector("#devis-reference");
+const devisDate        = document.querySelector("#devis-date");
+const devisValidite    = document.querySelector("#devis-validite");
+
+// Durée pendant laquelle le devis reste valable.
+// En fret aérien, les tarifs bougent constamment (carburant, capacité,
+// saisonnalité) : un devis sans date limite engagerait indéfiniment.
+const VALIDITE_DEVIS_JOURS = 7;
+
+/*
+  Fabrique une référence de devis à partir de l'identifiant de la cotation.
+  Format : AC-2026-0821-4471
+    AC   = préfixe de l'application
+    2026 = année, 0821 = mois et jour d'émission
+    4471 = les 4 derniers chiffres de l'identifiant
+
+  padStart(2, "0") complète avec des zéros à gauche : le mois 8 devient "08".
+  Sans ça, les références n'auraient pas toutes la même longueur.
+  getMonth() renvoie 0 pour janvier — d'où le + 1.
+*/
+function genererReference(identifiant) {
+  const date = new Date(identifiant);
+
+  const annee = date.getFullYear();
+  const mois  = String(date.getMonth() + 1).padStart(2, "0");
+  const jour  = String(date.getDate()).padStart(2, "0");
+
+  // slice(-4) prend les 4 derniers caractères.
+  const suffixe = String(identifiant).slice(-4);
+
+  return `AC-${annee}-${mois}${jour}-${suffixe}`;
+}
+
+/*
+  Formate une date au format français : 21/08/2026.
+  toLocaleDateString applique les conventions du pays demandé —
+  même principe qu'Intl.NumberFormat pour les montants.
+*/
+function formaterDate(date) {
+  return date.toLocaleDateString("fr-FR");
+}
+
+/*
+  Remplit l'en-tête du devis. Appelé à chaque affichage de cotation,
+  y compris pour une cotation ressortie de l'historique : la référence
+  doit rester CELLE D'ORIGINE et non être régénérée, sinon le même devis
+  changerait de numéro à chaque consultation.
+*/
+function remplirEnteteDevis(cotation) {
+  // Les cotations enregistrées avant l'ajout de cette fonctionnalité
+  // n'ont pas de date d'émission : on retombe sur leur identifiant.
+  const emission = cotation.enregistreeLe
+    ? new Date(cotation.enregistreeLe)
+    : new Date(cotation.id);
+
+  const expiration = new Date(emission);
+  expiration.setDate(expiration.getDate() + VALIDITE_DEVIS_JOURS);
+
+  devisReference.textContent = genererReference(cotation.id);
+  devisDate.textContent      = formaterDate(emission);
+  devisValidite.textContent  = formaterDate(expiration);
+}
+
+/*
+  window.print() ouvre la boîte de dialogue d'impression du navigateur.
+  L'utilisateur peut alors imprimer sur papier ou choisir
+  "Enregistrer au format PDF".
+
+  C'est la solution la plus simple et la plus fiable : aucune bibliothèque
+  de génération de PDF à installer, et le rendu est celui que l'utilisateur
+  voit dans l'aperçu avant de valider.
+
+  ⚠️ Une application professionnelle générerait souvent le PDF côté serveur,
+  pour garantir un rendu identique quel que soit le navigateur et pouvoir
+  archiver le document. Ici, l'impression navigateur est le bon arbitrage :
+  zéro dépendance pour un résultat correct.
+*/
+boutonImprimer.addEventListener("click", function () {
+  window.print();
+});
+
+
+/* ============================================================
+   6. LE BRANCHEMENT DU FORMULAIRE
    ============================================================ */
 
 const formulaire = document.querySelector("#formulaire-cotation");
@@ -361,5 +681,22 @@ formulaire.addEventListener("submit", function (evenement) {
   }
 
   const cotation = calculerCotation(expedition);
+
+  /*
+    On ajoute deux informations qui ne relèvent pas du calcul :
+    un identifiant unique et la date d'enregistrement.
+
+    Elles sont ajoutées ICI, et non dans calculerCotation(), pour garder
+    cette fonction "pure" : mêmes données en entrée, même résultat en sortie,
+    toujours. Date.now() changeant à chaque appel, l'y mettre rendrait la
+    fonction impossible à tester de façon fiable.
+
+    Date.now() renvoie le nombre de millisecondes écoulées depuis 1970 :
+    deux clics ne peuvent pas tomber sur la même valeur.
+  */
+  cotation.id = Date.now();
+  cotation.enregistreeLe = new Date().toISOString();
+
   afficherCotation(cotation);
+  ajouterAHistorique(cotation);
 });

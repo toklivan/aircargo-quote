@@ -44,27 +44,14 @@
         <div class="champ">
           <label for="depart">Aéroport de départ</label>
           <select id="depart" name="depart" required>
-            <option value="CDG">CDG — Paris Charles de Gaulle</option>
-            <option value="MRS">MRS — Marseille Provence</option>
-            <option value="LGG">LGG — Liège</option>
-            <option value="JFK">JFK — New York</option>
-            <option value="DXB">DXB — Dubaï</option>
-            <option value="HKG">HKG — Hong Kong</option>
-            <option value="SIN">SIN — Singapour</option>
+            <!-- Les <option> sont générées par script.js -->
           </select>
         </div>
 
         <div class="champ">
           <label for="arrivee">Aéroport d'arrivée</label>
-          <!-- selected : présélectionne cette option à l'ouverture de la page -->
           <select id="arrivee" name="arrivee" required>
-            <option value="CDG">CDG — Paris Charles de Gaulle</option>
-            <option value="MRS">MRS — Marseille Provence</option>
-            <option value="LGG">LGG — Liège</option>
-            <option value="JFK">JFK — New York</option>
-            <option value="DXB">DXB — Dubaï</option>
-            <option value="HKG" selected>HKG — Hong Kong</option>
-            <option value="SIN">SIN — Singapour</option>
+            <!-- Les <option> sont générées par script.js -->
           </select>
         </div>
 
@@ -86,10 +73,7 @@
         <div class="champ">
           <label for="type">Type de marchandise</label>
           <select id="type" name="type" required>
-            <option value="standard">Standard</option>
-            <option value="fragile">Fragile</option>
-            <option value="perissable">Périssable (chaîne du froid)</option>
-            <option value="dangereuse">Dangereuse (DGR)</option>
+            <!-- Les <option> sont générées par script.js -->
           </select>
         </div>
 
@@ -107,7 +91,14 @@
       </form>
     </section>
 
-    <!-- ===== SECTION 2 : LE RÉSULTAT ===== -->
+    <!--
+      La colonne de droite regroupe tout ce que le JavaScript produit :
+      les erreurs, la cotation en cours, et l'historique.
+      Sans ce conteneur, la grille placerait ces blocs n'importe où selon
+      qu'ils sont visibles ou masqués — le résultat sauterait d'une colonne
+      à l'autre. Un conteneur explicite rend la mise en page prévisible.
+    -->
+    <div class="colonne-droite">
 
     <!--
       role="alert" : indique aux lecteurs d'écran que ce message doit être
@@ -117,6 +108,27 @@
     <p id="message-erreur" role="alert" hidden></p>
 
     <section id="section-resultat" class="carte" hidden>
+
+      <!--
+        EN-TÊTE DE DEVIS — visible uniquement à l'impression.
+        La classe .impression-seule est masquée à l'écran par le CSS,
+        et révélée dans le bloc @media print.
+        Un document imprimé doit se suffire à lui-même : sans émetteur,
+        référence ni date, la feuille est inexploitable une fois détachée
+        de l'écran qui l'a produite.
+      -->
+      <div class="impression-seule entete-devis">
+        <div class="devis-emetteur">
+          <strong>AirCargo Quote</strong><br>
+          Cotation de fret aérien
+        </div>
+        <div class="devis-references">
+          <div>Référence : <span id="devis-reference"></span></div>
+          <div>Émis le : <span id="devis-date"></span></div>
+          <div>Valable jusqu'au : <span id="devis-validite"></span></div>
+        </div>
+      </div>
+
       <h2>Détail de la cotation</h2>
 
       <!-- Ligne de résumé : trajet, distance, poids retenu -->
@@ -150,7 +162,60 @@
           </tr>
         </tfoot>
       </table>
+
+      <!-- ===== ACTIONS ===== -->
+      <div class="bloc-explication">
+        <div class="barre-actions">
+          <button type="button" id="bouton-expliquer">Expliquer ce prix</button>
+          <button type="button" id="bouton-imprimer">Imprimer le devis</button>
+        </div>
+
+        <!--
+          aria-live="polite" : prévient les lecteurs d'écran que le contenu
+          de cette zone peut changer sans action de l'utilisateur, et qu'il
+          faut l'annoncer une fois la lecture en cours terminée.
+          Sans ça, une personne aveugle ne saurait jamais que la réponse
+          est arrivée.
+        -->
+        <p id="zone-explication" aria-live="polite" hidden></p>
+      </div>
+
+      <!--
+        MENTIONS — visibles uniquement à l'impression.
+        Les tarifs de ce projet sont fictifs : le document doit le dire.
+        Un devis qui laisserait croire à un engagement ferme alors qu'il
+        n'en est pas un poserait un vrai problème, pas un problème de forme.
+      -->
+      <p class="impression-seule devis-mentions">
+        Devis non contractuel, établi à titre indicatif. Tarifs hors taxes,
+        hors frais de douane et hors assurance. Sous réserve de disponibilité
+        de capacité à la date demandée et d'acceptation de la marchandise par
+        la compagnie. Document généré automatiquement — projet de démonstration.
+      </p>
     </section>
+
+    <!-- ===== L'HISTORIQUE ===== -->
+    <section id="section-historique" class="carte">
+
+      <div class="entete-historique">
+        <h2>Historique</h2>
+        <!--
+          type="button" : ESSENTIEL. Un <button> placé dans ou près d'un
+          formulaire est de type "submit" par défaut et déclencherait
+          l'envoi du formulaire. Ici on veut juste exécuter du JavaScript.
+        -->
+        <button type="button" id="bouton-vider" hidden>Tout supprimer</button>
+      </div>
+
+      <!-- Message affiché quand l'historique est vide : un écran vide sans
+           explication laisse l'utilisateur se demander si l'outil a bugué. -->
+      <p id="historique-vide">Aucune cotation enregistrée pour le moment.</p>
+
+      <!-- <ul> : une liste. Les <li> sont créés par le JavaScript. -->
+      <ul id="liste-historique"></ul>
+    </section>
+
+    </div><!-- fin .colonne-droite -->
 
   </main>
 
@@ -160,6 +225,13 @@
     dans le <head>, il s'exécuterait avant que le formulaire existe,
     et ne le trouverait pas.
   -->
+  <!--
+    L'ORDRE COMPTE. calcul.js définit les fonctions et les tables de données ;
+    script.js les utilise. Le navigateur lit la page de haut en bas :
+    si l'ordre était inversé, script.js chercherait des fonctions
+    qui n'existent pas encore.
+  -->
+  <script src="calcul.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
