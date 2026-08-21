@@ -300,13 +300,4 @@ réseau et le saut de texte au chargement.
 
 ## Feuille de route
 
-- [x] Formulaire de saisie et moteur de calcul
-- [x] Affichage détaillé de la décomposition du prix
-- [x] Mise en forme
-- [x] Historique des cotations (localStorage)
-- [x] Explication du prix en langage naturel via l'API Mistral
-- [x] Tests unitaires et intégration continue
-- [x] Devis imprimable
-- [x] Interface bilingue français / anglais
-- [ ] Limitation de débit sur le point d'entrée d'explication
-- [ ] Booking : transformation d'un devis en réservation
+La trajectoire vers la v2.0 est décrite dans [ROADMAP.md](ROADMAP.md).
