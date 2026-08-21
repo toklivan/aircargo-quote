@@ -77,11 +77,16 @@ app.use(express.static(path.join(__dirname, "..")));
   les autres requêtes. Une fonction qui contient "await" doit être "async".
 */
 app.post("/api/expliquer", async (requete, reponse) => {
-  const cotation = requete.body;
+  // Le front envoie désormais { cotation, langue }.
+  const cotation = requete.body?.cotation;
+  const langue = requete.body?.langue === "en" ? "en" : "fr"; // "fr" par défaut
 
   // --- Validation ---
   // On ne fait jamais confiance aux données reçues, même venant de notre
   // propre front : n'importe qui peut envoyer une requête à cette adresse.
+  // La langue est ramenée à l'une des deux valeurs attendues plutôt que
+  // reprise telle quelle : une valeur libre venue du client n'a rien à
+  // faire dans un prompt.
   if (!cotation || typeof cotation.total !== "number") {
     return reponse.status(400).json({ erreur: "Cotation invalide." });
   }
@@ -104,13 +109,29 @@ app.post("/api/expliquer", async (requete, reponse) => {
     Le prompt système : il définit le rôle et les contraintes du modèle.
     Le message "user" apporte uniquement les faits.
     Séparer les deux évite qu'une donnée inattendue soit prise pour une consigne.
+
+    Une consigne par langue, écrite directement dans la langue cible.
+    Traduire la consigne française mot à mot donnerait un anglais maladroit ;
+    et demander "réponds en anglais" à la fin d'une consigne française
+    fonctionne mal, le modèle glissant facilement vers le français.
   */
-  const consigne =
-    "Tu es un assistant commercial spécialisé en fret aérien. " +
-    "On te fournit le détail chiffré d'une cotation déjà calculée. " +
-    "Explique en français simple, à un client non spécialiste, pourquoi ce prix est ce qu'il est. " +
-    "Ne recalcule aucun montant : reprends uniquement les chiffres fournis. " +
-    "Trois à cinq phrases, pas de liste à puces, pas de formule de politesse.";
+  const CONSIGNES = {
+    fr:
+      "Tu es un assistant commercial spécialisé en fret aérien. " +
+      "On te fournit le détail chiffré d'une cotation déjà calculée. " +
+      "Explique en français simple, à un client non spécialiste, pourquoi ce prix est ce qu'il est. " +
+      "Ne recalcule aucun montant : reprends uniquement les chiffres fournis. " +
+      "Trois à cinq phrases, pas de liste à puces, pas de formule de politesse.",
+
+    en:
+      "You are a sales assistant specialised in air freight. " +
+      "You are given the itemised breakdown of a quotation that has already been calculated. " +
+      "Explain in plain English, to a non-specialist customer, why the price is what it is. " +
+      "Do not recalculate any amount: use only the figures provided. " +
+      "Three to five sentences, no bullet points, no greetings or sign-off."
+  };
+
+  const consigne = CONSIGNES[langue];
 
   try {
     /*

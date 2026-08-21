@@ -14,7 +14,8 @@
     3. L'historique              (localStorage)
     4. L'explication par l'IA    (appel à notre serveur proxy)
     5. Le devis imprimable
-    6. Le branchement du formulaire
+    6. Le changement de langue
+    7. Le branchement du formulaire
 */
 
 "use strict";
@@ -42,7 +43,7 @@ const messageErreur   = document.querySelector("#message-erreur");
   L'alternative bricolée (montant.toFixed(2) + " €") donne "1553.77 €",
   avec un point décimal — ce qui n'est pas correct en français.
 */
-const formatEuros = new Intl.NumberFormat("fr-FR", {
+let formatEuros = new Intl.NumberFormat(TRADUCTIONS[langue].codeLangue, {
   style: "currency",
   currency: "EUR"
 });
@@ -100,39 +101,54 @@ function afficherCotation(cotation) {
   remplirEnteteDevis(cotation);
 
   // --- Le résumé au-dessus du tableau ---
-  resumeTrajet.textContent =
-    `${cotation.depart} → ${cotation.arrivee} · ${cotation.distance} km · départ dans ${cotation.joursAvantDepart} jour(s)`;
+  resumeTrajet.textContent = t("resumeTrajet", {
+    depart: cotation.depart,
+    arrivee: cotation.arrivee,
+    distance: cotation.distance,
+    jours: cotation.joursAvantDepart
+  });
 
   // On indique explicitement lequel des deux poids a été retenu :
   // c'est la règle métier la moins évidente, elle mérite d'être visible.
-  const poidsRetenu = cotation.poidsTaxable === cotation.poidsReel ? "poids réel" : "poids volumétrique";
-  resumePoids.textContent =
-    `Poids réel ${cotation.poidsReel.toFixed(1)} kg · Poids volumétrique ${cotation.poidsVolumetrique.toFixed(1)} kg ` +
-    `→ poids taxable retenu ${cotation.poidsTaxable.toFixed(1)} kg (${poidsRetenu})`;
+  const poidsRetenu = cotation.poidsTaxable === cotation.poidsReel
+    ? t("poidsReelLibelle")
+    : t("poidsVolumetriqueLibelle");
+
+  resumePoids.textContent = t("resumePoids", {
+    reel: cotation.poidsReel.toFixed(1),
+    volumetrique: cotation.poidsVolumetrique.toFixed(1),
+    taxable: cotation.poidsTaxable.toFixed(1),
+    retenu: poidsRetenu
+  });
 
   // --- Les lignes du tableau ---
   // On les prépare dans un tableau JS avant de les insérer.
   const lignes = [
     creerLigneDetail(
-      "Transport",
-      `${cotation.poidsTaxable.toFixed(1)} kg × ${cotation.tarifParKg.toFixed(2)} €/kg`,
+      t("ligneTransport"),
+      t("baseTransport", {
+        poids: cotation.poidsTaxable.toFixed(1),
+        tarif: formaterEuros(cotation.tarifParKg)
+      }),
       cotation.prixDeBase
     ),
     creerLigneDetail(
-      `Majoration marchandise — ${TYPES_MARCHANDISE[cotation.type].libelle}`,
-      cotation.tauxType === 0 ? "aucune" : `+${cotation.tauxType * 100} % du transport`,
+      `${t("ligneMajorationType")} — ${TYPES_MARCHANDISE[cotation.type].libelle[langue]}`,
+      cotation.tauxType === 0
+        ? t("baseAucune")
+        : t("basePourcentage", { taux: cotation.tauxType * 100 }),
       cotation.montantType
     ),
     creerLigneDetail(
-      "Majoration urgence",
+      t("ligneUrgence"),
       cotation.estUrgent
-        ? `départ à J+${cotation.joursAvantDepart} · +${MAJORATION_URGENCE * 100} % du transport`
-        : `départ à J+${cotation.joursAvantDepart} · non applicable`,
+        ? t("baseUrgenceActive", { jours: cotation.joursAvantDepart, taux: MAJORATION_URGENCE * 100 })
+        : t("baseUrgenceInactive", { jours: cotation.joursAvantDepart }),
       cotation.montantUrgence
     ),
     creerLigneDetail(
-      "Frais de dossier",
-      "forfait par expédition",
+      t("ligneFrais"),
+      t("baseForfait"),
       cotation.fraisDeDossier
     )
   ];
@@ -194,27 +210,39 @@ function remplirListe(liste, donnees, libelleDe, valeurParDefaut) {
   liste.value = valeurParDefaut;
 }
 
-// On remplit les trois listes au chargement de la page.
-remplirListe(
-  document.querySelector("#depart"),
-  AEROPORTS,
-  (code) => `${code} — ${AEROPORTS[code]}`,
-  "CDG"
-);
+/*
+  Construit les trois listes déroulantes.
 
-remplirListe(
-  document.querySelector("#arrivee"),
-  AEROPORTS,
-  (code) => `${code} — ${AEROPORTS[code]}`,
-  "HKG"
-);
+  Regroupé dans une fonction (et non exécuté directement) parce qu'il faut
+  pouvoir les reconstruire au changement de langue : les libellés des types
+  de marchandise sont traduits. Les paramètres permettent de conserver la
+  sélection en cours pendant cette reconstruction.
+*/
+function construireListes(depart, arrivee, type) {
+  remplirListe(
+    document.querySelector("#depart"),
+    AEROPORTS,
+    (code) => `${code} — ${AEROPORTS[code]}`,
+    depart
+  );
 
-remplirListe(
-  document.querySelector("#type"),
-  TYPES_MARCHANDISE,
-  (cle) => TYPES_MARCHANDISE[cle].libelle,
-  "standard"
-);
+  remplirListe(
+    document.querySelector("#arrivee"),
+    AEROPORTS,
+    (code) => `${code} — ${AEROPORTS[code]}`,
+    arrivee
+  );
+
+  remplirListe(
+    document.querySelector("#type"),
+    TYPES_MARCHANDISE,
+    (cle) => TYPES_MARCHANDISE[cle].libelle[langue],
+    type
+  );
+}
+
+// Valeurs par défaut au premier chargement.
+construireListes("CDG", "HKG", "standard");
 
 /*
   La syntaxe (code) => ... s'appelle une "fonction fléchée".
@@ -320,8 +348,10 @@ function creerLigneHistorique(cotation) {
   // Le contexte, en petit et en gris
   const details = document.createElement("span");
   details.className = "histo-details";
-  details.textContent =
-    `${cotation.poidsTaxable.toFixed(0)} kg taxables · ${TYPES_MARCHANDISE[cotation.type].libelle}`;
+  details.textContent = t("histoDetails", {
+    poids: cotation.poidsTaxable.toFixed(0),
+    type: TYPES_MARCHANDISE[cotation.type].libelle[langue]
+  });
 
   const montant = document.createElement("span");
   montant.className = "histo-montant";
@@ -336,7 +366,7 @@ function creerLigneHistorique(cotation) {
   boutonSupprimer.textContent = "×";
   // aria-label : le texte lu par un lecteur d'écran. Un "×" seul
   // ne veut rien dire à l'oreille.
-  boutonSupprimer.setAttribute("aria-label", "Supprimer cette cotation");
+  boutonSupprimer.setAttribute("aria-label", t("supprimerCotation"));
 
   ligne.append(boutonConsulter, boutonSupprimer);
   return ligne;
@@ -427,7 +457,7 @@ boutonVider.addEventListener("click", function () {
   // pas être stylé. Une vraie application utiliserait une fenêtre modale
   // maison. Ici, une confirmation avant une action irréversible vaut mieux
   // qu'un design parfait — c'est le bon arbitrage pour une V1.
-  if (!confirm("Supprimer toutes les cotations enregistrées ?")) {
+  if (!confirm(t("confirmerVidage"))) {
     return;
   }
 
@@ -458,7 +488,7 @@ function reinitialiserExplication() {
   zoneExplication.textContent = "";
   zoneExplication.classList.remove("explication-erreur");
   boutonExpliquer.disabled = false;
-  boutonExpliquer.textContent = "Expliquer ce prix";
+  boutonExpliquer.textContent = t("boutonExpliquer");
 }
 
 function afficherErreurExplication(message) {
@@ -491,7 +521,7 @@ async function demanderExplication() {
     - chaque clic déclenche un appel facturé au modèle
   */
   boutonExpliquer.disabled = true;
-  boutonExpliquer.textContent = "Analyse en cours…";
+  boutonExpliquer.textContent = t("boutonExpliquerCharge");
   zoneExplication.hidden = true;
   zoneExplication.classList.remove("explication-erreur");
 
@@ -505,13 +535,15 @@ async function demanderExplication() {
     const reponse = await fetch("/api/expliquer", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(cotationAffichee)
+      // On transmet la langue : l'explication doit arriver dans la
+      // langue de l'interface, pas systématiquement en français.
+      body: JSON.stringify({ cotation: cotationAffichee, langue: langue })
     });
 
     // .ok est vrai si le code HTTP est un succès (200 à 299).
     if (!reponse.ok) {
       const donnees = await reponse.json().catch(() => ({}));
-      afficherErreurExplication(donnees.erreur || "Explication indisponible.");
+      afficherErreurExplication(donnees.erreur || t("erreurExplication"));
       return;
     }
 
@@ -529,9 +561,7 @@ async function demanderExplication() {
   } catch (erreur) {
     // Ce catch attrape les pannes réseau : serveur arrêté, connexion coupée.
     console.error("Appel au serveur impossible :", erreur);
-    afficherErreurExplication(
-      "Serveur injoignable. Vérifie qu'il est bien démarré (npm start)."
-    );
+    afficherErreurExplication(t("erreurServeur"));
 
   } finally {
     /*
@@ -541,7 +571,7 @@ async function demanderExplication() {
       grisé définitivement.
     */
     boutonExpliquer.disabled = false;
-    boutonExpliquer.textContent = "Expliquer ce prix";
+    boutonExpliquer.textContent = t("boutonExpliquer");
   }
 }
 
@@ -592,7 +622,7 @@ function genererReference(identifiant) {
   même principe qu'Intl.NumberFormat pour les montants.
 */
 function formaterDate(date) {
-  return date.toLocaleDateString("fr-FR");
+  return date.toLocaleDateString(TRADUCTIONS[langue].codeLangue);
 }
 
 /*
@@ -636,7 +666,87 @@ boutonImprimer.addEventListener("click", function () {
 
 
 /* ============================================================
-   6. LE BRANCHEMENT DU FORMULAIRE
+   6. LE CHANGEMENT DE LANGUE
+   ============================================================ */
+
+const boutonsLangue = document.querySelectorAll(".bouton-langue");
+
+/*
+  Applique la langue en cours à toute la page.
+
+  querySelectorAll("[data-i18n]") sélectionne TOUS les éléments portant
+  cet attribut. On parcourt la liste et on remplace le texte de chacun
+  par sa traduction.
+
+  C'est tout l'intérêt du système : le HTML ne contient plus de texte
+  "définitif", seulement des clés. Une page, deux langues, aucun fichier
+  dupliqué.
+*/
+function appliquerLangue() {
+  document.querySelectorAll("[data-i18n]").forEach(function (element) {
+    element.textContent = t(element.dataset.i18n);
+  });
+
+  // Le titre de l'onglet et l'attribut lang de la page.
+  // documentElement, c'est la balise <html>. L'attribut lang indique
+  // aux lecteurs d'écran dans quelle langue prononcer le contenu, et
+  // aux navigateurs quelle langue proposer à la traduction automatique.
+  document.title = t("titrePage");
+  document.documentElement.lang = langue;
+
+  // Les formats de nombres suivent la langue : 1 553,77 € en français,
+  // €1,553.77 en anglais. Le formateur doit donc être reconstruit.
+  formatEuros = new Intl.NumberFormat(TRADUCTIONS[langue].codeLangue, {
+    style: "currency",
+    currency: "EUR"
+  });
+
+  // aria-pressed indique quelle langue est active, pour l'affichage
+  // comme pour les lecteurs d'écran.
+  boutonsLangue.forEach(function (bouton) {
+    bouton.setAttribute("aria-pressed", String(bouton.dataset.langue === langue));
+  });
+
+  // Les listes déroulantes contiennent des libellés traduits :
+  // on les regénère, en conservant la sélection en cours.
+  const departActuel  = document.querySelector("#depart").value;
+  const arriveeActuel = document.querySelector("#arrivee").value;
+  const typeActuel    = document.querySelector("#type").value;
+  construireListes(departActuel, arriveeActuel, typeActuel);
+
+  // Tout ce qui a été produit dynamiquement doit être redessiné.
+  afficherHistorique();
+
+  if (cotationAffichee) {
+    afficherCotation(cotationAffichee);
+  }
+}
+
+function changerLangue(nouvelleLangue) {
+  langue = nouvelleLangue;
+
+  try {
+    localStorage.setItem(CLE_LANGUE, langue);
+  } catch (erreur) {
+    // Stockage indisponible : la langue s'appliquera quand même,
+    // simplement elle ne survivra pas au rechargement.
+  }
+
+  appliquerLangue();
+}
+
+boutonsLangue.forEach(function (bouton) {
+  bouton.addEventListener("click", function () {
+    changerLangue(bouton.dataset.langue);
+  });
+});
+
+// Au chargement, on applique la langue retenue du dernier passage.
+appliquerLangue();
+
+
+/* ============================================================
+   7. LE BRANCHEMENT DU FORMULAIRE
    ============================================================ */
 
 const formulaire = document.querySelector("#formulaire-cotation");
@@ -666,17 +776,17 @@ formulaire.addEventListener("submit", function (evenement) {
 
   // Contrôles de cohérence que le navigateur ne peut pas faire tout seul.
   if (expedition.depart === expedition.arrivee) {
-    afficherErreur("Le départ et l'arrivée doivent être deux aéroports différents.");
+    afficherErreur(t("erreurMemeAeroport"));
     return; // return interrompt la fonction ici : on ne calcule pas.
   }
 
   if (trouverDistance(expedition.depart, expedition.arrivee) === null) {
-    afficherErreur("Cette liaison n'est pas desservie.");
+    afficherErreur(t("erreurLiaison"));
     return;
   }
 
   if (calculerJoursAvantDepart(expedition.date) < 0) {
-    afficherErreur("La date d'expédition ne peut pas être dans le passé.");
+    afficherErreur(t("erreurDatePassee"));
     return;
   }
 

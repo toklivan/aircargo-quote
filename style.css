@@ -106,6 +106,57 @@ header {
   padding: 20px var(--espace);
 }
 
+/* Titre à gauche, sélecteur de langue à droite */
+.entete-contenu {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--espace);
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.selecteur-langue {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.bouton-langue {
+  padding: 5px 11px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #9FB3C4;
+  background: none;
+  border: 1px solid #2C4F6E;
+  border-radius: var(--rayon);
+  cursor: pointer;
+  transition: color 0.15s, background-color 0.15s;
+}
+
+.bouton-langue:hover {
+  color: var(--blanc);
+}
+
+/*
+  [aria-pressed="true"] : on style à partir de l'attribut d'accessibilité
+  lui-même, plutôt qu'avec une classe "active" en parallèle.
+  Un seul état à maintenir, donc aucun risque que l'apparence et
+  l'information transmise aux lecteurs d'écran divergent.
+*/
+.bouton-langue[aria-pressed="true"] {
+  color: var(--marine);
+  background-color: var(--blanc);
+  border-color: var(--blanc);
+}
+
+.bouton-langue:focus-visible {
+  outline: 2px solid var(--blanc);
+  outline-offset: 1px;
+}
+
 header p {
   margin: 4px 0 0;
   font-size: 13px;
