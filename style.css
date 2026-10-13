@@ -584,6 +584,13 @@ tfoot th {
   cursor: not-allowed;
 }
 
+/* Note affichée à côté du bouton quand le serveur est absent */
+#note-explication {
+  align-self: center;
+  font-size: 12px;
+  color: var(--gris-texte);
+}
+
 #bouton-expliquer:focus-visible {
   outline: 2px solid var(--bleu-acier);
   outline-offset: 1px;

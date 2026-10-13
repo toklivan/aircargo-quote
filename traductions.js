@@ -86,7 +86,8 @@ const TRADUCTIONS = {
     erreurLiaison: "Cette liaison n'est pas desservie.",
     erreurDatePassee: "La date d'expédition ne peut pas être dans le passé.",
     erreurExplication: "Explication indisponible.",
-    erreurServeur: "Serveur injoignable. Vérifie qu'il est bien démarré (npm start)."
+    erreurServeur: "Serveur injoignable. Vérifie qu'il est bien démarré (npm start).",
+    noteServeurAbsent: "Disponible en lançant le serveur local"
   },
 
   en: {
@@ -148,7 +149,8 @@ const TRADUCTIONS = {
     erreurLiaison: "This route is not operated.",
     erreurDatePassee: "The shipping date cannot be in the past.",
     erreurExplication: "Explanation unavailable.",
-    erreurServeur: "Server unreachable. Check that it is running (npm start)."
+    erreurServeur: "Server unreachable. Check that it is running (npm start).",
+    noteServeurAbsent: "Available when running the local server"
   }
 };
 

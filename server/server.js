@@ -66,6 +66,15 @@ app.use(express.json({ limit: "10kb" }));
 app.use(express.static(path.join(__dirname, "..")));
 
 /*
+  Route de santé : permet à la page de savoir si le serveur tourne.
+  Sans serveur (page ouverte depuis GitHub Pages ou en double-clic),
+  l'appel échoue et la page désactive le bouton d'explication.
+*/
+app.get("/api/sante", (requete, reponse) => {
+  reponse.json({ ok: true });
+});
+
+/*
   Le point d'entrée de l'API.
 
   POST et non GET : on envoie des données dans le corps de la requête,

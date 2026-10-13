@@ -477,6 +477,31 @@ afficherHistorique();
 
 const boutonExpliquer = document.querySelector("#bouton-expliquer");
 const zoneExplication = document.querySelector("#zone-explication");
+const noteExplication = document.querySelector("#note-explication");
+
+/*
+  Vrai si le serveur répond. L'explication passe par le serveur, qui
+  détient la clé API : sans lui, le bouton n'a rien à appeler.
+*/
+let serveurDisponible = false;
+
+/*
+  Interroge la route /api/sante au chargement de la page.
+  Sur GitHub Pages ou en double-clic sur index.html, il n'y a pas de
+  serveur : fetch échoue ou renvoie une erreur 404, et le bouton est
+  désactivé avec une note explicative.
+*/
+async function verifierServeur() {
+  try {
+    const reponse = await fetch("/api/sante");
+    serveurDisponible = reponse.ok;
+  } catch (erreur) {
+    serveurDisponible = false;
+  }
+
+  boutonExpliquer.disabled = !serveurDisponible;
+  noteExplication.hidden = serveurDisponible;
+}
 
 /*
   Remet le bloc à zéro. Appelé à chaque nouvel affichage de cotation :
@@ -487,7 +512,7 @@ function reinitialiserExplication() {
   zoneExplication.hidden = true;
   zoneExplication.textContent = "";
   zoneExplication.classList.remove("explication-erreur");
-  boutonExpliquer.disabled = false;
+  boutonExpliquer.disabled = !serveurDisponible;
   boutonExpliquer.textContent = t("boutonExpliquer");
 }
 
@@ -507,7 +532,7 @@ function afficherErreurExplication(message) {
   l'attente — rien n'est gelé.
 */
 async function demanderExplication() {
-  if (!cotationAffichee) {
+  if (!cotationAffichee || !serveurDisponible) {
     return;
   }
 
@@ -576,6 +601,7 @@ async function demanderExplication() {
 }
 
 boutonExpliquer.addEventListener("click", demanderExplication);
+verifierServeur();
 
 
 /* ============================================================
