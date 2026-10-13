@@ -1,6 +1,6 @@
 # Feuille de route — vers la v2.0.0
 
-Version actuelle : **1.3.0**
+Version actuelle : **1.3.1**
 
 Ce document décrit la trajectoire de l'outil et la méthode retenue pour
 l'emprunter sans jamais livrer une version cassée.
