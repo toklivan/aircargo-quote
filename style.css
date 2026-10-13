@@ -377,9 +377,9 @@ tfoot th {
   Le message est masqué par l'attribut "hidden" du HTML tant que le
   JavaScript ne l'a pas retiré — aucun CSS n'est nécessaire pour le cacher.
 
-  ⚠️ ATTENTION, PIÈGE CLASSIQUE : si on écrivait "display: block" ici,
-  cette règle écraserait l'attribut hidden et le message serait TOUJOURS
-  visible. C'est une erreur fréquente et pénible à diagnostiquer.
+  Attention : écrire "display: block" ici écraserait l'attribut hidden,
+  et le message serait toujours visible. C'est une erreur fréquente
+  et pénible à diagnostiquer.
 */
 #message-erreur {
   margin: 0;

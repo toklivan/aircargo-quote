@@ -39,8 +39,8 @@ const messageErreur   = document.querySelector("#message-erreur");
   Intl.NumberFormat est un outil intégré au navigateur qui connaît les
   conventions de chaque pays : virgule décimale, espace comme séparateur
   de milliers, symbole € après le nombre.
-  ⚠️ C'est un peu "avancé", mais c'est LA façon professionnelle de faire.
-  L'alternative bricolée (montant.toFixed(2) + " €") donne "1553.77 €",
+  C'est la méthode standard pour formater une monnaie.
+  L'alternative manuelle (montant.toFixed(2) + " €") donne "1553.77 €",
   avec un point décimal — ce qui n'est pas correct en français.
 */
 let formatEuros = new Intl.NumberFormat(TRADUCTIONS[langue].codeLangue, {
@@ -189,10 +189,10 @@ function masquerErreur() {
     - libelleDe : une fonction qui, pour une clé, renvoie le texte à afficher
     - valeurParDefaut : la clé présélectionnée à l'ouverture
 
-  ⚠️ Passer une FONCTION en paramètre (libelleDe) est un cran au-dessus
-  du reste du fichier. C'est justifié ici : les deux tables n'ont pas la
-  même forme (AEROPORTS contient du texte, TYPES_MARCHANDISE contient des
-  objets), et ça évite d'écrire deux fonctions presque identiques.
+  libelleDe est une fonction passée en paramètre. C'est justifié ici :
+  les deux tables n'ont pas la même forme (AEROPORTS contient du texte,
+  TYPES_MARCHANDISE contient des objets), et ça évite d'écrire deux
+  fonctions presque identiques.
 */
 function remplirListe(liste, donnees, libelleDe, valeurParDefaut) {
   // Object.keys(objet) renvoie un tableau des clés :
@@ -442,7 +442,7 @@ listeHistorique.addEventListener("click", function (evenement) {
     const cotation = historique.find((c) => String(c.id) === id);
 
     if (cotation) {
-      // On réutilise telle quelle la fonction d'affichage de l'étape 2.
+      // On réutilise telle quelle la fonction d'affichage.
       // C'est le bénéfice direct d'avoir séparé calcul et affichage :
       // afficherCotation() ne se soucie pas de savoir si la cotation
       // vient d'être calculée ou sort du stockage.
@@ -453,7 +453,7 @@ listeHistorique.addEventListener("click", function (evenement) {
 
 boutonVider.addEventListener("click", function () {
   // confirm() ouvre une boîte de dialogue native et renvoie true ou false.
-  // ⚠️ RACCOURCI PÉDAGOGIQUE : confirm() bloque toute la page et ne peut
+  // Simplification : confirm() bloque toute la page et ne peut
   // pas être stylé. Une vraie application utiliserait une fenêtre modale
   // maison. Ici, une confirmation avant une action irréversible vaut mieux
   // qu'un design parfait — c'est le bon arbitrage pour une V1.
@@ -553,7 +553,7 @@ async function demanderExplication() {
       textContent et non innerHTML.
       Ce texte vient d'un modèle de langage : c'est du contenu qu'on ne
       contrôle pas. L'interpréter comme du HTML ouvrirait une faille XSS.
-      C'est exactement le cas de figure évoqué plus tôt dans le projet.
+      La règle s'applique à tout contenu externe affiché par la page.
     */
     zoneExplication.textContent = donnees.explication;
     zoneExplication.hidden = false;
@@ -655,7 +655,7 @@ function remplirEnteteDevis(cotation) {
   de génération de PDF à installer, et le rendu est celui que l'utilisateur
   voit dans l'aperçu avant de valider.
 
-  ⚠️ Une application professionnelle générerait souvent le PDF côté serveur,
+  Limite : une application en production générerait souvent le PDF côté serveur,
   pour garantir un rendu identique quel que soit le navigateur et pouvoir
   archiver le document. Ici, l'impression navigateur est le bon arbitrage :
   zéro dépendance pour un résultat correct.

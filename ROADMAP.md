@@ -178,7 +178,7 @@ réservation et devient la référence de suivi.
 
 **Traitement technique.** Une machine à états, écrite comme une fonction pure
 (`transitionAutorisee(statutActuel, action)`), donc entièrement testable sans
-interface ni stockage. Les quatre mots de l'annonce — pricing, cotation,
+interface ni stockage. Les quatre étapes du métier — pricing, cotation,
 booking, tracking — deviennent un parcours continu dans l'outil.
 
 **Rétrocompatibilité.** Les cotations existantes prennent le statut

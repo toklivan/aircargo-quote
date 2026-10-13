@@ -50,8 +50,8 @@ const AEROPORTS = {
   la fonction trouverDistance() s'occupe de chercher dans les deux ordres.
   Ça divise la table par deux et évite les incohérences.
 
-  ⚠️ Ce sont des distances orthodromiques approximatives, arrondies.
-  Amélioration V2 possible : stocker les coordonnées GPS des aéroports
+  Limite : ce sont des distances orthodromiques approximatives, arrondies.
+  Amélioration possible : stocker les coordonnées GPS des aéroports
   et calculer la distance avec la formule de Haversine.
 */
 const DISTANCES = {
@@ -139,7 +139,7 @@ function trouverDistance(depart, arrivee) {
 /*
   Calcule le nombre de jours entre aujourd'hui et la date souhaitée.
 
-  ⚠️ RACCOURCI PÉDAGOGIQUE : la manipulation des dates en JavaScript est un
+  Simplification : la manipulation des dates en JavaScript est un
   sujet piégeux (fuseaux horaires, heure d'été). Ici on remet l'heure à minuit
   des deux côtés pour comparer des journées entières, ce qui suffit largement.
   Dans une vraie application, ce calcul se ferait côté serveur, ou avec une
@@ -232,10 +232,10 @@ function calculerCotation(expedition) {
   On teste donc sa présence avant d'exporter, sinon le navigateur
   planterait sur une variable inconnue.
 
-  ⚠️ C'est un raccourci pédagogique assumé. Un projet moderne utiliserait
-  les modules ES (import / export), standard depuis 2015 et supportés
-  partout. Le choix de rester sur des balises <script> classiques évite
-  d'avoir à expliquer en plus le type="module" et ses contraintes.
+  Simplification : un projet moderne utiliserait les modules ES
+  (import / export), standard depuis 2015 et supportés partout. Les balises
+  <script> classiques ont été gardées pour rester sans outil de build et
+  sans les contraintes du type="module".
 */
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
