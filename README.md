@@ -3,22 +3,28 @@
 [![Tests](https://github.com/toklivan/aircargo-quote/actions/workflows/tests.yml/badge.svg)](https://github.com/toklivan/aircargo-quote/actions/workflows/tests.yml)
 
 Simulation d'un outil de cotation de fret aérien, écrite en HTML, CSS et
-JavaScript sans framework, avec un petit serveur Node.js pour l'appel à l'API
-Mistral.
+JavaScript sans framework, avec un petit serveur Node.js pour les appels à
+l'API Mistral : analyser une demande client et expliquer un prix.
 
 **Démo :** [toklivan.github.io/aircargo-quote](https://toklivan.github.io/aircargo-quote/)
-— version statique, sans serveur : l'explication du prix y est désactivée.
+— version statique, sans serveur : l'assistant de saisie et l'explication du
+prix y sont désactivés.
 
 ![Détail d'une cotation](docs/screenshots/02-detail-prix.png)
 
-| Devis imprimable | Historique |
+| Assistant de saisie | Devis imprimable |
 |---|---|
-| ![Devis imprimable](docs/screenshots/04-devis-imprimable.png) | ![Historique](docs/screenshots/03-historique.png) |
+| ![Assistant de saisie](docs/screenshots/06-assistant-saisie.png) | ![Devis imprimable](docs/screenshots/04-devis-imprimable.png) |
 
 ![Interface en anglais](docs/screenshots/05-interface-anglais.png)
 
 ## Fonctionnalités
 
+- **Assistant de saisie** : un mail client collé en texte libre est analysé par
+  un modèle Mistral, qui pré-remplit le formulaire. Les champs proposés sont
+  surlignés, les champs introuvables sont vidés et signalés, et une alerte
+  s'affiche en cas de marchandise dangereuse. Le calcul n'est jamais lancé
+  automatiquement : l'agent relit et valide.
 - **Cotation** à partir d'un trajet, d'un poids, d'un volume, d'un type de
   marchandise et d'une date d'expédition.
 - **Détail du prix ligne par ligne**, avec la base de calcul de chaque ligne :
@@ -75,16 +81,17 @@ npm test
 ```
 
 Sans serveur, en ouvrant `index.html` directement, tout fonctionne sauf
-l'explication du prix.
+l'assistant de saisie et l'explication du prix.
 
 ## Architecture
 
 ```
-calcul.js         calcul du prix, sans aucun accès à la page
-traductions.js    textes français et anglais
-script.js         interface : affichage, historique, devis, appels au serveur
-server/server.js  proxy vers l'API Mistral
-tests/            tests unitaires du calcul
+calcul.js             calcul du prix, sans aucun accès à la page
+traductions.js        textes français et anglais
+script.js             interface : affichage, historique, devis, appels au serveur
+server/server.js      proxy vers l'API Mistral
+server/extraction.js  vérification des propositions du modèle
+tests/                tests unitaires du calcul et de la vérification
 ```
 
 **Le calcul est séparé de l'interface.** `calcul.js` ne touche jamais à la
@@ -98,12 +105,29 @@ appelle donc le serveur, et c'est lui qui appelle Mistral avec la clé lue dans
 n'expose pas le détail des erreurs de l'API.
 
 Au chargement, la page appelle `/api/sante`. Si le serveur ne répond pas,
-comme sur GitHub Pages, le bouton d'explication est désactivé.
+comme sur GitHub Pages, l'assistant et le bouton d'explication sont désactivés.
 
-**Tests et intégration continue.** 15 tests unitaires écrits avec le module
-de test intégré à Node (`node:test`), sans dépendance. Ils couvrent le choix
-entre poids réel et poids volumétrique, le seuil exact de l'urgence et la
-cohérence entre les lignes du détail et le total. Les dates de test sont
+**L'assistant de saisie ne fait pas confiance au modèle.** Le modèle répond
+en JSON, mais le serveur vérifie chaque valeur avant de la renvoyer :
+aéroport présent dans la table de `calcul.js`, poids et volume positifs et
+plausibles, type connu, date existante et non passée. Toute valeur hors de
+ces règles devient vide. La consigne interdit d'inventer une information ou
+d'estimer un volume à partir d'un nombre de palettes : un champ vide se voit,
+une valeur approximative non. Dès qu'une marchandise dangereuse est signalée,
+le type passe en « Dangereuse », à l'agent de le corriger si l'alerte est
+infondée.
+
+Le texte collé est traité comme une donnée non fiable. Il est limité à
+2 000 caractères, encadré par des délimiteurs dans le prompt, et seuls les
+six champs du formulaire peuvent ressortir de l'analyse : une instruction
+glissée dans un mail ne peut ni fixer un prix ni déclencher un calcul.
+
+**Tests et intégration continue.** 28 tests unitaires écrits avec le module
+de test intégré à Node (`node:test`), sans dépendance. Pour le calcul, ils
+couvrent le choix entre poids réel et poids volumétrique, le seuil exact de
+l'urgence et la cohérence entre les lignes du détail et le total. Pour
+l'assistant, ils soumettent à la vérification des réponses de modèle fausses
+ou piégées, sans appeler l'API. Les dates de test sont
 calculées par rapport au jour d'exécution pour ne pas expirer. GitHub Actions
 lance les tests à chaque push et à chaque pull request sur `main`.
 
@@ -111,7 +135,9 @@ lance les tests à chaque push et à chaque pull request sur `main`.
 
 - L'historique reste dans le navigateur : il n'est ni partagé ni sauvegardé
   ailleurs.
-- La route d'explication n'a pas de limitation de débit.
+- Les routes qui appellent Mistral n'ont pas de limitation de débit.
+- L'assistant ne traite qu'une expédition par demande et ne connaît que les
+  aéroports de la table. Les alertes restent dans la langue du mail.
 - Les distances entre aéroports sont stockées en dur et arrondies.
 - La comparaison des dates ignore les fuseaux horaires.
 - Le PDF dépend du navigateur qui l'imprime.

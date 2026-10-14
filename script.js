@@ -11,11 +11,12 @@
   Organisation du fichier :
     1. L'affichage de la cotation
     2. La construction du formulaire (listes générées depuis les données)
-    3. L'historique              (localStorage)
-    4. L'explication par l'IA    (appel à notre serveur proxy)
-    5. Le devis imprimable
-    6. Le changement de langue
-    7. Le branchement du formulaire
+    3. L'assistant de saisie     (analyse d'une demande client)
+    4. L'historique              (localStorage)
+    5. L'explication par l'IA    (appel à notre serveur proxy)
+    6. Le devis imprimable
+    7. Le changement de langue
+    8. Le branchement du formulaire
 */
 
 "use strict";
@@ -253,7 +254,178 @@ construireListes("CDG", "HKG", "standard");
 
 
 /* ============================================================
-   3. L'HISTORIQUE
+   3. L'ASSISTANT DE SAISIE
+   ============================================================ */
+
+const texteDemande    = document.querySelector("#texte-demande");
+const boutonAnalyser  = document.querySelector("#bouton-analyser");
+const noteAssistant   = document.querySelector("#note-assistant");
+const retourAssistant = document.querySelector("#retour-assistant");
+
+/*
+  Les six champs que le serveur peut proposer, avec la clé de traduction
+  de leur libellé. Les identifiants HTML des champs portent le même nom
+  que les clés (#depart, #arrivee...) : pas besoin d'une seconde table.
+*/
+const LIBELLES_CHAMPS = {
+  depart:  "labelDepart",
+  arrivee: "labelArrivee",
+  poids:   "labelPoids",
+  volume:  "labelVolume",
+  type:    "labelType",
+  date:    "labelDate"
+};
+
+// La dernière analyse reçue. On la garde pour réafficher le message
+// dans l'autre langue si l'agent change de langue.
+let derniereAnalyse = null;
+
+// Retire les marques laissées par une analyse précédente.
+function effacerMarquesAssistant() {
+  document.querySelectorAll(".champ-suggere, .champ-manquant").forEach(function (bloc) {
+    bloc.classList.remove("champ-suggere", "champ-manquant");
+  });
+}
+
+/*
+  Remplit le formulaire avec la proposition du serveur.
+
+  Un champ trouvé reçoit sa valeur et la classe "champ-suggere".
+  Un champ manquant est VIDÉ et reçoit la classe "champ-manquant".
+
+  Le vider plutôt que garder l'ancienne valeur est volontaire : une
+  valeur restée d'une saisie précédente passerait pour une valeur lue
+  dans le mail. Vide, l'attribut "required" empêche en plus de lancer
+  le calcul tant que l'agent ne l'a pas complété.
+*/
+function preRemplirFormulaire(champs) {
+  effacerMarquesAssistant();
+
+  Object.keys(LIBELLES_CHAMPS).forEach(function (nom) {
+    const element = document.querySelector("#" + nom);
+    // closest(".champ") remonte au bloc qui contient le label et le champ.
+    const bloc = element.closest(".champ");
+
+    if (champs[nom] === null) {
+      element.value = "";
+      bloc.classList.add("champ-manquant");
+    } else {
+      element.value = String(champs[nom]);
+      bloc.classList.add("champ-suggere");
+    }
+  });
+}
+
+/*
+  Construit le message affiché sous la zone de texte.
+  Comme partout dans l'application : createElement et textContent,
+  jamais innerHTML. Les alertes sont produites par le modèle à partir
+  d'un texte écrit par le client : c'est du contenu externe.
+*/
+function afficherRetourAssistant(analyse) {
+  const lignes = [];
+  const rienTrouve = analyse.manquants.length === Object.keys(LIBELLES_CHAMPS).length;
+
+  const statut = document.createElement("p");
+  statut.textContent = rienTrouve ? t("assistantRien") : t("assistantVerifier");
+  lignes.push(statut);
+
+  if (!rienTrouve && analyse.manquants.length > 0) {
+    const manquants = document.createElement("p");
+    manquants.textContent = t("assistantManquants", {
+      champs: analyse.manquants.map((nom) => t(LIBELLES_CHAMPS[nom])).join(", ")
+    });
+    lignes.push(manquants);
+  }
+
+  analyse.alertes.forEach(function (alerte) {
+    const ligne = document.createElement("p");
+    ligne.className = "alerte-dgr";
+    ligne.textContent = t("assistantAlerte", { alerte: alerte });
+    lignes.push(ligne);
+  });
+
+  retourAssistant.replaceChildren(...lignes);
+  retourAssistant.classList.remove("retour-erreur");
+  retourAssistant.hidden = false;
+}
+
+function afficherErreurAssistant(message) {
+  const ligne = document.createElement("p");
+  ligne.textContent = message;
+  retourAssistant.replaceChildren(ligne);
+  retourAssistant.classList.add("retour-erreur");
+  retourAssistant.hidden = false;
+}
+
+/*
+  Envoie le texte collé au serveur et applique sa proposition.
+  Le calcul n'est PAS lancé : l'agent relit, corrige, puis clique
+  lui-même sur "Calculer la cotation".
+*/
+async function analyserDemande() {
+  const texte = texteDemande.value.trim();
+  if (texte === "") {
+    return;
+  }
+
+  boutonAnalyser.disabled = true;
+  boutonAnalyser.textContent = t("boutonAnalyserCharge");
+
+  try {
+    const reponse = await fetch("/api/extraire", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ texte: texte })
+    });
+
+    if (!reponse.ok) {
+      derniereAnalyse = null;
+      afficherErreurAssistant(t("erreurAssistant"));
+      return;
+    }
+
+    const analyse = await reponse.json();
+    derniereAnalyse = analyse;
+
+    // Si rien n'a été trouvé, on ne touche pas au formulaire :
+    // le vider entièrement n'aiderait personne.
+    if (analyse.manquants.length < Object.keys(LIBELLES_CHAMPS).length) {
+      preRemplirFormulaire(analyse.champs);
+    }
+    afficherRetourAssistant(analyse);
+
+  } catch (erreur) {
+    console.error("Appel au serveur impossible :", erreur);
+    derniereAnalyse = null;
+    afficherErreurAssistant(t("erreurServeur"));
+
+  } finally {
+    // Le bouton n'a pu être cliqué que si le serveur était disponible :
+    // on le réactive dans tous les cas, comme pour l'explication.
+    boutonAnalyser.disabled = false;
+    boutonAnalyser.textContent = t("boutonAnalyser");
+  }
+}
+
+boutonAnalyser.addEventListener("click", analyserDemande);
+
+/*
+  Dès que l'agent modifie un champ marqué, la marque disparaît :
+  la valeur est désormais la sienne, plus celle de l'assistant.
+  Un seul écouteur sur tout le formulaire (délégation d'événements).
+  L'évènement "input" est émis aussi bien par les champs que par les listes.
+*/
+document.querySelector("#formulaire-cotation").addEventListener("input", function (evenement) {
+  const bloc = evenement.target.closest(".champ");
+  if (bloc) {
+    bloc.classList.remove("champ-suggere", "champ-manquant");
+  }
+});
+
+
+/* ============================================================
+   4. L'HISTORIQUE
    ============================================================ */
 
 /*
@@ -472,7 +644,7 @@ afficherHistorique();
 
 
 /* ============================================================
-   4. L'EXPLICATION PAR L'IA
+   5. L'EXPLICATION PAR L'IA
    ============================================================ */
 
 const boutonExpliquer = document.querySelector("#bouton-expliquer");
@@ -501,6 +673,11 @@ async function verifierServeur() {
 
   boutonExpliquer.disabled = !serveurDisponible;
   noteExplication.hidden = serveurDisponible;
+
+  // L'assistant de saisie passe lui aussi par le serveur.
+  boutonAnalyser.disabled = !serveurDisponible;
+  texteDemande.disabled = !serveurDisponible;
+  noteAssistant.hidden = serveurDisponible;
 }
 
 /*
@@ -605,7 +782,7 @@ verifierServeur();
 
 
 /* ============================================================
-   5. LE DEVIS IMPRIMABLE
+   6. LE DEVIS IMPRIMABLE
    ============================================================ */
 
 const boutonImprimer   = document.querySelector("#bouton-imprimer");
@@ -692,7 +869,7 @@ boutonImprimer.addEventListener("click", function () {
 
 
 /* ============================================================
-   6. LE CHANGEMENT DE LANGUE
+   7. LE CHANGEMENT DE LANGUE
    ============================================================ */
 
 const boutonsLangue = document.querySelectorAll(".bouton-langue");
@@ -711,6 +888,12 @@ const boutonsLangue = document.querySelectorAll(".bouton-langue");
 function appliquerLangue() {
   document.querySelectorAll("[data-i18n]").forEach(function (element) {
     element.textContent = t(element.dataset.i18n);
+  });
+
+  // Même principe pour le texte d'exemple affiché dans une zone vide.
+  // dataset.i18nPlaceholder correspond à l'attribut data-i18n-placeholder.
+  document.querySelectorAll("[data-i18n-placeholder]").forEach(function (element) {
+    element.placeholder = t(element.dataset.i18nPlaceholder);
   });
 
   // Le titre de l'onglet et l'attribut lang de la page.
@@ -746,6 +929,10 @@ function appliquerLangue() {
   if (cotationAffichee) {
     afficherCotation(cotationAffichee);
   }
+
+  if (derniereAnalyse) {
+    afficherRetourAssistant(derniereAnalyse);
+  }
 }
 
 function changerLangue(nouvelleLangue) {
@@ -772,7 +959,7 @@ appliquerLangue();
 
 
 /* ============================================================
-   7. LE BRANCHEMENT DU FORMULAIRE
+   8. LE BRANCHEMENT DU FORMULAIRE
    ============================================================ */
 
 const formulaire = document.querySelector("#formulaire-cotation");
@@ -835,4 +1022,8 @@ formulaire.addEventListener("submit", function (evenement) {
 
   afficherCotation(cotation);
   ajouterAHistorique(cotation);
+
+  // Le calcul est lancé : l'agent a validé les valeurs proposées,
+  // les marques de l'assistant n'ont plus lieu d'être.
+  effacerMarquesAssistant();
 });

@@ -10,8 +10,9 @@
     6. Les messages d'erreur
     7. L'historique
     8. L'explication par l'IA
-    9. L'adaptation mobile
-   10. Le devis imprimé
+    9. L'assistant de saisie
+   10. L'adaptation mobile
+   11. Le devis imprimé
 */
 
 
@@ -35,6 +36,7 @@
   --gris-bord:   #D5DCE3;  /* bordures, séparateurs */
   --gris-texte:  #5A6B7A;  /* textes secondaires */
   --rouge:       #B23A2E;  /* erreurs uniquement */
+  --ambre:       #8A5000;  /* alertes marchandises dangereuses */
   --blanc:       #FFFFFF;
 
   --rayon: 4px;            /* arrondi des angles, discret */
@@ -555,7 +557,8 @@ tfoot th {
 }
 
 #bouton-expliquer,
-#bouton-imprimer {
+#bouton-imprimer,
+#bouton-analyser {
   padding: 8px 14px;
   font-family: inherit;
   font-size: 13px;
@@ -569,6 +572,7 @@ tfoot th {
 }
 
 #bouton-expliquer:hover:not(:disabled),
+#bouton-analyser:hover:not(:disabled),
 #bouton-imprimer:hover {
   color: var(--blanc);
   background-color: var(--bleu-acier);
@@ -579,19 +583,23 @@ tfoot th {
   cursor: not-allowed et l'opacité réduite disent visuellement
   "attends, ça travaille" — sans ça l'utilisateur reclique.
 */
-#bouton-expliquer:disabled {
+#bouton-expliquer:disabled,
+#bouton-analyser:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
 
 /* Note affichée à côté du bouton quand le serveur est absent */
-#note-explication {
+#note-explication,
+#note-assistant {
   align-self: center;
   font-size: 12px;
   color: var(--gris-texte);
 }
 
-#bouton-expliquer:focus-visible {
+#bouton-expliquer:focus-visible,
+#bouton-analyser:focus-visible,
+#texte-demande:focus-visible {
   outline: 2px solid var(--bleu-acier);
   outline-offset: 1px;
 }
@@ -616,7 +624,86 @@ tfoot th {
 
 
 /* ============================================================
-   9. L'ADAPTATION MOBILE
+   9. L'ASSISTANT DE SAISIE
+   ============================================================ */
+
+/* Séparé du formulaire par un trait : c'est une aide, pas un champ */
+.bloc-assistant {
+  margin-bottom: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--gris-bord);
+}
+
+.bloc-assistant label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gris-texte);
+  margin-bottom: 5px;
+}
+
+#texte-demande {
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 9px 10px;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--marine);
+  background-color: var(--blanc);
+  border: 1px solid var(--gris-bord);
+  border-radius: var(--rayon);
+  /* resize: vertical : l'agent peut agrandir la zone en hauteur
+     pour un long mail, sans casser la largeur de la colonne. */
+  resize: vertical;
+}
+
+#texte-demande:disabled {
+  background-color: var(--gris-fond);
+  cursor: not-allowed;
+}
+
+#retour-assistant {
+  margin-top: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+#retour-assistant p {
+  margin: 0 0 6px;
+}
+
+#retour-assistant.retour-erreur {
+  color: var(--rouge);
+}
+
+/* Une alerte DGR doit se voir : fond ambré et liseré à gauche */
+.alerte-dgr {
+  padding: 8px 10px;
+  color: var(--ambre);
+  background-color: #FDF3E1;
+  border-left: 3px solid var(--ambre);
+}
+
+/*
+  Les champs remplis par l'assistant sont teintés en bleu, ceux qu'il
+  n'a pas trouvés ont une bordure en pointillés. Les deux marques
+  disparaissent dès que l'agent modifie le champ.
+*/
+.champ-suggere input,
+.champ-suggere select {
+  border-color: var(--bleu-acier);
+  background-color: #EEF4F9;
+}
+
+.champ-manquant input,
+.champ-manquant select {
+  border: 1px dashed var(--ambre);
+}
+
+
+/* ============================================================
+   10. L'ADAPTATION MOBILE
    ============================================================ */
 
 /*
@@ -647,7 +734,7 @@ tfoot th {
 
 
 /* ============================================================
-   10. LE DEVIS IMPRIMÉ
+   11. LE DEVIS IMPRIMÉ
    ============================================================ */
 
 /*

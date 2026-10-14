@@ -87,7 +87,18 @@ const TRADUCTIONS = {
     erreurDatePassee: "La date d'expédition ne peut pas être dans le passé.",
     erreurExplication: "Explication indisponible.",
     erreurServeur: "Serveur injoignable. Vérifie qu'il est bien démarré (npm start).",
-    noteServeurAbsent: "Disponible en lançant le serveur local"
+    noteServeurAbsent: "Disponible en lançant le serveur local",
+
+    // Assistant de saisie
+    labelAssistant: "Partir d'une demande client",
+    placeholderAssistant: "Collez ici le mail du client. Exemple : 3 palettes pour Hong Kong depuis Paris la semaine prochaine, environ 800 kg, dont une avec des batteries lithium.",
+    boutonAnalyser: "Analyser la demande",
+    boutonAnalyserCharge: "Analyse en cours…",
+    assistantVerifier: "Formulaire pré-rempli. Vérifiez chaque valeur avant de calculer.",
+    assistantRien: "Aucune information exploitable dans ce texte.",
+    assistantManquants: "À compléter : {champs}",
+    assistantAlerte: "Marchandise dangereuse signalée\u00a0: {alerte}. Type passé en «\u00a0Dangereuse\u00a0», à confirmer avec l'expéditeur.",
+    erreurAssistant: "Analyse indisponible."
   },
 
   en: {
@@ -150,7 +161,17 @@ const TRADUCTIONS = {
     erreurDatePassee: "The shipping date cannot be in the past.",
     erreurExplication: "Explanation unavailable.",
     erreurServeur: "Server unreachable. Check that it is running (npm start).",
-    noteServeurAbsent: "Available when running the local server"
+    noteServeurAbsent: "Available when running the local server",
+
+    labelAssistant: "Start from a customer request",
+    placeholderAssistant: "Paste the customer's email here. Example: 3 pallets from Paris to Hong Kong next week, about 800 kg, one of them with lithium batteries.",
+    boutonAnalyser: "Analyse request",
+    boutonAnalyserCharge: "Analysing…",
+    assistantVerifier: "Form pre-filled. Check every value before calculating.",
+    assistantRien: "No usable information found in this text.",
+    assistantManquants: "To complete: {champs}",
+    assistantAlerte: "Dangerous goods flagged: {alerte}. Commodity set to \"Dangerous goods\", to be confirmed with the shipper.",
+    erreurAssistant: "Analysis unavailable."
   }
 };
 

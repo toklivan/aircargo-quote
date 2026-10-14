@@ -4,6 +4,6 @@
   "description": "Outil de cotation de fret aerien",
   "private": true,
   "scripts": {
-    "test": "node --test tests/calcul.test.js"
+    "test": "node --test tests/calcul.test.js tests/extraction.test.js"
   }
 }
