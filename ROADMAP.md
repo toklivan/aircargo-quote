@@ -1,6 +1,6 @@
 # Feuille de route — vers la v2.0.0
 
-Version actuelle : **1.3.1**
+Version actuelle : **1.4.0**
 
 Ce document décrit la trajectoire de l'outil et la méthode retenue pour
 l'emprunter sans jamais livrer une version cassée.
@@ -48,8 +48,7 @@ par un interrupteur unique :
 ```javascript
 const FONCTIONNALITES = {
   margeInterne: true,
-  capaciteVols: false,   // v1.5 — code présent, pas encore activé
-  assistantSaisie: false // v1.9
+  capaciteVols: false    // v1.6 — code présent, pas encore activé
 };
 ```
 
@@ -63,7 +62,7 @@ deviennent impossibles à fusionner.
 On n'écrase jamais une structure existante. On **ajoute** le nouveau champ,
 on fait cohabiter les deux, on migre, puis seulement on **retire** l'ancien.
 
-Appliqué au stockage : la v1.8 introduit la persistance serveur sans
+Appliqué au stockage : la v1.9 introduit la persistance serveur sans
 supprimer le `localStorage`. Les deux coexistent derrière une même interface,
 le serveur devient la source de vérité, et le stockage local n'est retiré
 qu'en v2.0 — quand plus rien n'en dépend. C'est le *strangler fig* : le
@@ -83,7 +82,7 @@ change — ici, quand l'authentification devient obligatoire et que les données
 locales disparaissent. Chaque livraison est marquée :
 
 ```bash
-git tag -a v1.4.0 -m "Marge interne et cloisonnement des donnees"
+git tag -a v1.4.0 -m "Assistant de saisie"
 git push --tags
 ```
 
@@ -91,7 +90,34 @@ git push --tags
 
 ## Les étapes
 
-### v1.4.0 — Marge et cloisonnement interne
+### v1.4.0 — L'assistant de saisie *(livrée)*
+
+**Ce que ça apporte.** Le retournement de l'usage de l'IA. Jusqu'ici, le
+modèle intervenait **à la fin**, une fois le travail fait, pour rédiger un
+texte que l'agent aurait pu écrire lui-même. Désormais il intervient aussi
+**au début**, là où le temps se perd réellement.
+
+Une demande arrive en texte libre, par mail :
+
+> « Bonjour, 3 palettes pour Hong Kong semaine prochaine, environ 800 kg,
+> dont une avec des batteries lithium. »
+
+L'agent colle ce texte. Le modèle propose une expédition structurée — trajet,
+poids, type, date — et **lève un signalement DGR sur les batteries**. Le
+volume n'étant pas donné, le champ reste vide et signalé : le modèle n'estime
+pas un volume à partir d'un nombre de palettes. L'agent complète, corrige,
+puis lance le calcul.
+
+**Le principe qui compte.** Le modèle ne décide rien et ne déclenche rien : il
+prépare une saisie, un humain valide. Sa réponse est vérifiée champ par champ
+côté serveur, par une fonction pure testée sans appel à l'API.
+
+**Pourquoi avant la marge.** L'étape ne dépend d'aucune autre et apporte un
+gain de temps immédiat et mesurable. Elle a donc été avancée.
+
+---
+
+### v1.5.0 — Marge et cloisonnement interne
 
 **Ce que ça apporte.** Un modèle de coût de revient (capacité, manutention,
 traitement documentaire) et, en regard du prix, la marge en euros et en
@@ -99,7 +125,7 @@ pourcentage. Un simulateur de remise : l'agent saisit la remise demandée par
 le client, la marge se recalcule en direct, une alerte se déclenche sous le
 plancher défini.
 
-**Pourquoi en premier.** C'est le geste qui lève l'ambiguïté sur la nature de
+**Pourquoi c'est important.** C'est le geste qui lève l'ambiguïté sur la nature de
 l'outil. Une application qui affiche sa propre marge ne peut pas être
 destinée au client. La frontière interne / externe devient explicite et se
 matérialise en trois endroits :
@@ -121,7 +147,7 @@ déjà enregistrées s'affichent sans marge.
 
 ---
 
-### v1.5.0 — Le référentiel des vols
+### v1.6.0 — Le référentiel des vols
 
 **Ce que ça apporte.** Une table de vols : numéro, appareil, capacité en
 charge marchande et en volume, taux de remplissage courant. L'écran affiche
@@ -135,7 +161,7 @@ comportement n'en dépend. On valide le modèle avant de s'appuyer dessus.
 
 ---
 
-### v1.6.0 — Le prix suit le remplissage
+### v1.7.0 — Le prix suit le remplissage
 
 **Ce que ça apporte.** Le cœur métier de la v2. `calculerCotation()` accepte
 un second argument optionnel, le vol :
@@ -154,15 +180,15 @@ surtout de **la contrainte qui sature en premier** : une expédition dense sur
 un vol saturé en volume est valorisée différemment d'une expédition
 volumineuse sur un vol saturé en masse.
 
-**Pourquoi un paramètre optionnel.** La fonction reste pure et les quinze
-tests existants continuent de passer sans modification — ils appellent la
+**Pourquoi un paramètre optionnel.** La fonction reste pure et les tests
+existants continuent de passer sans modification — ils appellent la
 fonction sans vol et obtiennent exactement les mêmes montants. Les nouveaux
 tests couvrent le second chemin. Aucune régression possible sur les cotations
 déjà émises.
 
 ---
 
-### v1.7.0 — Le cycle de vie du dossier
+### v1.8.0 — Le cycle de vie du dossier
 
 **Ce que ça apporte.** Une cotation cesse d'être un objet mort. Elle acquiert
 un statut et un historique horodaté :
@@ -186,7 +212,7 @@ booking, tracking — deviennent un parcours continu dans l'outil.
 
 ---
 
-### v1.8.0 — La persistance serveur
+### v1.9.0 — La persistance serveur
 
 **Ce que ça apporte.** Une base SQLite et une API REST. Trois tables : vols,
 cotations, événements de statut. Le `localStorage` cesse d'être la source de
@@ -203,29 +229,6 @@ une conséquence.
 serveur. Le reste du code ne sait pas laquelle est active. Les données
 locales existantes sont migrées au premier démarrage. C'est le cœur du
 *strangler fig* — et l'étape qui rend la v2.0 possible sans réécriture.
-
----
-
-### v1.9.0 — L'assistant de saisie
-
-**Ce que ça apporte.** Le retournement de l'usage de l'IA. En v1, le modèle
-intervient **à la fin**, une fois le travail fait, pour rédiger un texte que
-l'agent aurait pu écrire lui-même. En v1.9, il intervient **au début**, là où
-le temps se perd réellement.
-
-Une demande arrive en texte libre, par mail :
-
-> « Bonjour, 3 palettes pour Hong Kong semaine prochaine, environ 800 kg,
-> dont une avec des batteries lithium. »
-
-L'agent colle ce texte. Le modèle propose une expédition structurée — trajet,
-poids, volume estimé — et **lève un signalement DGR sur les batteries**.
-L'agent valide ou corrige avant tout calcul.
-
-**Le principe qui compte.** Le modèle ne décide rien et ne déclenche rien : il
-prépare une saisie, un humain valide. Le gain de temps est mesurable, à la
-différence d'un texte explicatif. C'est ce qu'on appelle une solution
-agentique correctement bornée.
 
 ---
 
@@ -249,7 +252,7 @@ le numéro majeur change.
 - **Conteneurisation** — un `Dockerfile` et un `docker-compose.yml` pour que
   l'application et sa base démarrent d'une seule commande, à l'identique sur
   n'importe quelle machine.
-- **Retrait du `localStorage`** — plus rien n'en dépend depuis la v1.8. C'est
+- **Retrait du `localStorage`** — plus rien n'en dépend depuis la v1.9. C'est
   la phase *contract* : on supprime l'ancien chemin une fois qu'il est
   devenu inutile, pas avant.
 
@@ -273,10 +276,10 @@ Volontairement, et il est utile de savoir dire pourquoi :
 
 | Version | Apport | Compétence démontrée |
 |---|---|---|
-| 1.4.0 | Marge, remise, cloisonnement | Modélisation, minimisation des données |
-| 1.5.0 | Référentiel des vols | Modélisation de données |
-| 1.6.0 | Prix selon remplissage | Algorithmique, yield management |
-| 1.7.0 | Cycle de vie du dossier | Machine à états, tests |
-| 1.8.0 | Base de données et API | SQL, REST, migration progressive |
-| 1.9.0 | Assistant de saisie | Solutions agentiques bornées |
+| 1.4.0 | Assistant de saisie *(livrée)* | Solutions agentiques bornées, validation |
+| 1.5.0 | Marge, remise, cloisonnement | Modélisation, minimisation des données |
+| 1.6.0 | Référentiel des vols | Modélisation de données |
+| 1.7.0 | Prix selon remplissage | Algorithmique, yield management |
+| 1.8.0 | Cycle de vie du dossier | Machine à états, tests |
+| 1.9.0 | Base de données et API | SQL, REST, migration progressive |
 | 2.0.0 | Multi-utilisateur, Docker | Authentification, concurrence, conteneurs |
