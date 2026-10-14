@@ -66,6 +66,74 @@ app.use(express.json({ limit: "10kb" }));
 app.use(express.static(path.join(__dirname, "..")));
 
 /*
+  Envoie une conversation à Mistral et renvoie le texte de la réponse.
+  Les deux routes qui utilisent le modèle (explication et extraction)
+  passent par cette fonction : la clé, l'adresse et la gestion des
+  erreurs ne sont écrites qu'une fois.
+
+  options :
+    - temperature : degré de liberté du modèle
+    - maxTokens   : longueur maximale de la réponse
+    - formatJson  : si vrai, on demande à Mistral une réponse en JSON valide
+
+  En cas de problème (réseau coupé, erreur de l'API, réponse vide),
+  la fonction lance une erreur avec "throw". C'est la route appelante
+  qui l'attrape dans son try / catch et décide quoi répondre.
+*/
+async function appelerMistral(messages, options) {
+  const corps = {
+    model: MODELE,
+    messages: messages,
+    temperature: options.temperature,
+    max_tokens: options.maxTokens
+  };
+
+  if (options.formatJson) {
+    // Mode JSON de l'API : la réponse est garantie être du JSON valide.
+    // Son CONTENU, lui, n'est garanti par rien : il faudra le vérifier.
+    corps.response_format = { type: "json_object" };
+  }
+
+  /*
+    fetch envoie une requête HTTP. Il est disponible nativement dans
+    Node.js récent, comme dans le navigateur : même fonction, deux contextes.
+
+    L'en-tête Authorization transporte la clé. C'est cette ligne qui
+    justifie l'existence du serveur : elle ne doit jamais partir
+    vers le navigateur.
+  */
+  const reponseMistral = await fetch(URL_MISTRAL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${CLE_MISTRAL}`
+    },
+    body: JSON.stringify(corps)
+  });
+
+  if (!reponseMistral.ok) {
+    const detail = await reponseMistral.text();
+    throw new Error(`Mistral a répondu ${reponseMistral.status} : ${detail}`);
+  }
+
+  const donnees = await reponseMistral.json();
+
+  /*
+    L'API renvoie une liste de réponses possibles ("choices").
+    On prend la première.
+    L'écriture ?. est l'"optional chaining" : si un maillon de la chaîne
+    est absent, on obtient undefined au lieu d'une erreur qui casse tout.
+  */
+  const contenu = donnees.choices?.[0]?.message?.content;
+
+  if (!contenu) {
+    throw new Error("Réponse de Mistral sans contenu.");
+  }
+
+  return contenu;
+}
+
+/*
   Route de santé : permet à la page de savoir si le serveur tourne.
   Sans serveur (page ouverte depuis GitHub Pages ou en double-clic),
   l'appel échoue et la page désactive le bouton d'explication.
@@ -143,67 +211,27 @@ app.post("/api/expliquer", async (requete, reponse) => {
   const consigne = CONSIGNES[langue];
 
   try {
-    /*
-      fetch envoie une requête HTTP. Il est disponible nativement dans
-      Node.js récent, comme dans le navigateur : même fonction, deux contextes.
-
-      L'en-tête Authorization transporte la clé. C'est cette ligne qui
-      justifie l'existence du serveur : elle ne doit jamais partir
-      vers le navigateur.
-    */
-    const reponseMistral = await fetch(URL_MISTRAL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${CLE_MISTRAL}`
-      },
-      body: JSON.stringify({
-        model: MODELE,
-        messages: [
-          { role: "system", content: consigne },
-          { role: "user", content: resume }
-        ],
-        // temperature : le degré de liberté du modèle. Bas = réponses
-        // stables et factuelles. Pour un outil de cotation, on veut
-        // de la constance, pas de la créativité.
-        temperature: 0.3,
-        max_tokens: 300
-      })
-    });
-
-    if (!reponseMistral.ok) {
-      // On journalise le détail côté serveur pour pouvoir déboguer...
-      const detail = await reponseMistral.text();
-      console.error("Erreur Mistral :", reponseMistral.status, detail);
-
-      // ...mais on renvoie un message générique au navigateur.
-      // Une réponse d'API peut contenir des informations internes :
-      // on ne relaie jamais une erreur brute vers le client.
-      return reponse.status(502).json({
-        erreur: "Le service d'explication est momentanément indisponible."
-      });
-    }
-
-    const donnees = await reponseMistral.json();
-
-    /*
-      L'API renvoie une liste de réponses possibles ("choices").
-      On prend la première.
-      L'écriture ?. est l'"optional chaining" : si un maillon de la chaîne
-      est absent, on obtient undefined au lieu d'une erreur qui casse tout.
-    */
-    const explication = donnees.choices?.[0]?.message?.content;
-
-    if (!explication) {
-      return reponse.status(502).json({ erreur: "Réponse inattendue du modèle." });
-    }
+    const explication = await appelerMistral(
+      [
+        { role: "system", content: consigne },
+        { role: "user", content: resume }
+      ],
+      // temperature : le degré de liberté du modèle. Bas = réponses
+      // stables et factuelles. Pour un outil de cotation, on veut
+      // de la constance, pas de la créativité.
+      { temperature: 0.3, maxTokens: 300 }
+    );
 
     reponse.json({ explication: explication.trim() });
 
   } catch (erreur) {
-    // Panne réseau, DNS, timeout... tout ce qui empêche même d'atteindre Mistral.
-    console.error("Appel Mistral impossible :", erreur);
-    reponse.status(502).json({ erreur: "Le service d'explication est injoignable." });
+    // Le détail est journalisé côté serveur, le navigateur ne reçoit
+    // qu'un message générique : une réponse d'API peut contenir des
+    // informations internes qu'on ne relaie jamais au client.
+    console.error("Explication impossible :", erreur.message);
+    reponse.status(502).json({
+      erreur: "Le service d'explication est momentanément indisponible."
+    });
   }
 });
 
