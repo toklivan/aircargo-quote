@@ -43,6 +43,24 @@
       <h2 data-i18n="titreFormulaire">Nouvelle cotation</h2>
 
       <!--
+        L'ASSISTANT DE SAISIE.
+        Placé avant le formulaire et en dehors de lui : la zone de texte
+        ne fait pas partie de l'expédition, elle sert seulement à la
+        pré-remplir. data-i18n-placeholder traduit le texte d'exemple
+        affiché dans la zone vide.
+      -->
+      <div class="bloc-assistant">
+        <label for="texte-demande" data-i18n="labelAssistant">Partir d'une demande client</label>
+        <textarea id="texte-demande" rows="4" maxlength="2000"
+                  data-i18n-placeholder="placeholderAssistant"></textarea>
+        <div class="barre-actions">
+          <button type="button" id="bouton-analyser" data-i18n="boutonAnalyser">Analyser la demande</button>
+          <span id="note-assistant" data-i18n="noteServeurAbsent" hidden>Disponible en lançant le serveur local</span>
+        </div>
+        <div id="retour-assistant" aria-live="polite" hidden></div>
+      </div>
+
+      <!--
         <form> : regroupe les champs de saisie.
         L'attribut id nous permettra de le retrouver depuis le JavaScript.
         On utilise un vrai <form> (et pas juste des <input> en vrac) pour deux raisons :
